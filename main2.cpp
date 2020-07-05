@@ -32,10 +32,6 @@
 
 #include "main.hpp"
 #include <board.hpp>
-//#include "ili9341.hpp"
-//#include "plot.hpp"
-//#include "uihw.hpp"
-//#include "uihw.hpp"
 #include "common.hpp"
 #include "globals.hpp"
 #include "synthesizers.hpp"
@@ -47,10 +43,6 @@
 #include "stream_fifo.hpp"
 #include "sin_rom.hpp"
 #include "gain_cal.hpp"
-
-#ifdef HAS_SELF_TEST
-#include "self_test.hpp"
-#endif
 
 #include <libopencm3/stm32/timer.h>
 #include <libopencm3/cm3/scb.h>
@@ -166,13 +158,6 @@ static void startTimer(uint32_t timerDevice, int period) {
 	timer_set_counter(timerDevice, 0);
 	timer_enable_counter(timerDevice);
 }
-static void ui_timer_setup() {
-	rcc_periph_clock_enable(RCC_TIM2);
-	rcc_periph_reset_pulse(RST_TIM2);
-	nvic_set_priority(NVIC_TIM2_IRQ, 0x80);
-	nvic_enable_irq(NVIC_TIM2_IRQ);
-	startTimer(TIM2, tim2Period);
-}
 
 
 static void dsp_timer_setup() {
@@ -189,10 +174,7 @@ extern "C" void tim1_up_isr() {
 	systemTimeCounter += tim1Period;
 	adc_process();
 }
-extern "C" void tim2_isr() {
-	TIM2_SR = 0;
-	//UIHW::checkButtons();
-}
+
 
 static int si5351_doUpdate(uint32_t freqHz) {
 	// si5351 code seems to give high frequency errors when frequency
