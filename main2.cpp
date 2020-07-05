@@ -88,10 +88,6 @@ static volatile int usbTxQueueRPos = 0;
 // periods of a 1MHz clock; how often to call adc_process()
 static constexpr int tim1Period = 25;	// 1MHz / 25 = 40kHz
 
-// periods of a 1MHz clock; how often to call UIHW::checkButtons
-static constexpr int tim2Period = 50000;	// 1MHz / 50000 = 20Hz
-
-
 // value is in microseconds; increments at 40kHz by TIM1 interrupt
 volatile uint32_t systemTimeCounter = 0;
 
@@ -205,6 +201,7 @@ static void adf4350_setup() {
 	adf4350_tx.sendConfig();
 	adf4350_tx.sendN();
 }
+
 static void adf4350_update(freqHz_t freqHz) {
 	freqHz = freqHz_t(freqHz/adf4350_freqStep)*adf4350_freqStep;
 	synthesizers::adf4350_set(adf4350_tx, freqHz, adf4350_freqStep);
@@ -313,14 +310,6 @@ static void lcd_and_ui_setup() {
 	
 	lcd_spi_fast();
 }
-
-static void enterUSBDataMode() {
-	usbDataMode = true;
-}
-static void exitUSBDataMode() {
-	usbDataMode = false;
-}
-
 
 static complexf ecalApplyReflection(complexf refl, int freqIndex) {
 	#ifdef ECAL_PARTIAL
@@ -466,8 +455,6 @@ static void cmdRegisterWrite(int address);
 
 static void cmdReadFIFO(int address, int nValues) {
 	if(address != 0x30) return;
-	if(!usbDataMode)
-		enterUSBDataMode();
 
 	for(int i=0; i<nValues;) {
 		int rdRPos = usbTxQueueRPos;
@@ -563,8 +550,6 @@ static void setVNASweepToUSB() {
 	vnaMeasurement.resetSweep();
 }
 static void cmdRegisterWrite(int address) {
-	if(!usbDataMode)
-		enterUSBDataMode();
 	if(address == 0x00 || address == 0x10 || address == 0x20 || address == 0x22) {
 		setVNASweepToUSB();
 	}
@@ -576,7 +561,6 @@ static void cmdRegisterWrite(int address) {
 			outputRawSamples = true;
 		} else if(val == 2) {
 			outputRawSamples = false;
-			exitUSBDataMode();
 		}
 	}
 	if(address == 0x00 || address == 0x10 || address == 0x20) {
