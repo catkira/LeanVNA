@@ -308,96 +308,10 @@ static void lcd_and_ui_setup() {
 
 	pinMode(ili9341_cs, OUTPUT);
 	pinMode(xpt2046_cs, OUTPUT);
-	digitalWrite(ili9341_cs, HIGH);
-	digitalWrite(xpt2046_cs, HIGH);
+	digitalWrite(ili9341_cs, HIGH);	// disable LCD
+	digitalWrite(xpt2046_cs, HIGH); // disable touch screen
 	
-	
-
-	// setup hooks
-	/*
-	ili9341_conf_dc = ili9341_dc;
-	ili9341_spi_set_cs = [](bool selected) {
-		lcd_spi_waitDMA();
-		// if the xpt2046 is currently selected, deselect it
-		if(selected && digitalRead(xpt2046_cs) == LOW) {
-			digitalWrite(xpt2046_cs, HIGH);
-		}
-		digitalWrite(ili9341_cs, selected ? LOW : HIGH);
-	};*/
-	/*
-	ili9341_spi_transfer = [](uint32_t sdi, int bits) {
-		return lcd_spi_transfer(sdi, bits);
-	};
-	ili9341_spi_transfer_bulk = [](uint32_t words) {
-		lcd_spi_transfer_bulk((uint8_t*)ili9341_spi_buffer, words*2);
-	};
-	ili9341_spi_wait_bulk = []() {
-		lcd_spi_waitDMA();
-	};*/
 	lcd_spi_fast();
-/*
-	xpt2046.spiSetCS = [](bool selected) {
-		// a single SPI master is used for both the ILI9346 display and the
-		// touch controller; if an outstanding background DMA is in progress,
-		// we must wait for it to complete.
-		lcd_spi_waitDMA();
-
-		// if the ili9341 is currently selected, deselect it.
-		if(selected && digitalRead(ili9341_cs) == LOW) {
-			digitalWrite(ili9341_cs, HIGH);
-		}
-		digitalWrite(xpt2046_cs, selected ? LOW : HIGH);
-	};
-	xpt2046.spiTransfer = [](uint32_t sdi, int bits) {
-		myassert(digitalRead(ili9341_cs) == HIGH);
-
-		digitalWrite(ili9341_cs, HIGH);
-
-		lcd_spi_slow();
-		delayMicroseconds(10);
-		uint32_t ret = lcd_spi_transfer(sdi, bits);
-		delayMicroseconds(10);
-		lcd_spi_fast();
-		return ret;
-	};
-	delay(10);
-
-	xpt2046.begin(LCD_WIDTH, LCD_HEIGHT);
-
-	ili9341_init();
-	lcd_spi_fast();
-	// show test pattern
-	//ili9341_test(5);
-	// clear screen
-	 ili9341_clear_screen();
-
-	// tell the plotting code how to calculate frequency in Hz given an index
-	plot_getFrequencyAt = [](int index) {
-		return UIActions::frequencyAt(index);
-	};
-
-	// the plotter will periodically call this function when doing cpu-heavy work;
-	// use it to process outstanding UI events so that the UI isn't sluggish.
-	plot_tick = []() {
-		UIActions::application_doEvents();
-	};
-
-	plot_init();*/
-
-	// redraw all zones next time we draw
-	/*
-	redraw_request |= 0xff;
-
-	// don't block events
-	uiEnableProcessing();
-
-	// when the UI hardware emits an event, forward it to the UI code
-	UIHW::emitEvent = [](UIHW::UIEvent evt) {
-		// process the event on main thread; we are currently in interrupt context.
-		UIActions::enqueueEvent([evt]() {
-			ui_process(evt);
-		});
-	};*/
 }
 
 static void enterUSBDataMode() {
@@ -1034,20 +948,10 @@ int main(void) {
 	// set up lcd and hook up UI events
 	lcd_and_ui_setup();
 
-	// initialize UI hardware (buttons)
-	//UIHW::init(tim2Period);
-
-	// this timer is used by UI hardware to perform button ticks
-	//ui_timer_setup();
-
-	// work around spurious ui events at startup
 	delay(50);
-	//while(eventQueue.readable())
-//		eventQueue.dequeue();
-
+	
 	flash_config_recall();
-	//if(config.ui_options & UI_OPTIONS_FLIP)
-	//	ili9341_set_flip(true, true);
+
 
 	// show dmesg and wait for user input if there is an important error
 	if(shouldShowDmesg) {
@@ -1056,9 +960,6 @@ int main(void) {
 	}
 
 	printk("xtal freq %d.%03d MHz\n", (xtalFreqHz/1000000), ((xtalFreqHz/1000) % 1000));
-
-	//debug_plot_markmap();
-	//UIActions::printTouchCal();
 
 	si5351_i2c.init();
 	if(!synthesizers::si5351_setup()) {
@@ -1086,19 +987,13 @@ int main(void) {
 	}
 
 	setVNASweepToUSB();
-	//setVNASweepToUI();
-
-	usbDataMode = true;
 
 	while(true) {
 		// process any outstanding commands from usb
 		cmdInputFIFO.drain();
 		
-		if(usbDataMode) {
-			if(outputRawSamples)
-				usb_transmit_rawSamples();
-			//UIActions::application_doSingleEvent();
-		} 
+		if(outputRawSamples)
+			usb_transmit_rawSamples();
 	}
 }
 
@@ -1113,31 +1008,6 @@ extern "C" void abort() {
 		delay(1000);
 	}
 }
-/*
-extern "C" void *memcpy(void *dest, const void *src, size_t n) {
-	for(size_t i=0;i<n;i++)
-		((char*)dest)[i] = ((char*)src)[i];
-	return dest;
-}
-extern "C" void *memset(void *s, int c, size_t n) {
-	for(size_t i=0;i<n;i++)
-		((char*)s)[i] = c;
-}
-extern "C" size_t strlen(const char* s) {
-	int i = 0;
-	while(*s != 0) {
-		i++;
-		s++;
-	}
-	return i;
-}
-extern "C" int atoi(const char* s) {
-	// TODO: implement
-	return 0;
-}
-extern "C" void __aeabi_atexit(void * arg , void (* func ) (void *)) {
-	// Leave this function empty. Program never exits.
-}*/
 
 extern "C" {
 	__attribute__((used))
