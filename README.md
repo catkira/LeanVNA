@@ -1,3 +1,6 @@
+This is a fork from https://github.com/nanovna/NanoVNA-V2-firmware with the goal the create a firmware that outputs only raw ADC data. Old legacy stuff and all display code will be removed.
+
+Old readme:
 
 This repository contains the source code to build the firmware for the NanoVNA2 (or SAA2)
 See https://www.nanorfe.com for more info.
