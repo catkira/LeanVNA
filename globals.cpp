@@ -1,5 +1,4 @@
 #include "globals.hpp"
-#include "ili9341.hpp"
 
 volatile bool sweep_enabled = true;
 int16_t vbat;
@@ -7,6 +6,13 @@ int16_t vbat;
 uint8_t registers[registerSize];
 
 int16_t lastsaveid = 0;
+
+config_t config = {
+  .magic =             CONFIG_MAGIC,
+  .dac_value =         1922,
+  .checksum =          0
+};
+/*
 
 config_t config = {
   .magic =             CONFIG_MAGIC,
@@ -24,7 +30,7 @@ config_t config = {
   .harmonic_freq_threshold = 300000000,
   .ui_options =        0,
   .checksum =          0
-};
+};*/
 
 properties_t current_props;
 

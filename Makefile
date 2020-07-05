@@ -1,14 +1,14 @@
 # paths to libraries
-MCULIB         ?= /persist/mculib
-OPENCM3_DIR    ?= /persist/libopencm3
+MCULIB         ?= /media/sf__shared_git/mculib
+OPENCM3_DIR    ?= /media/sf__shared_git/libopencm3-gd32f3
 
 # device config
 BOARDNAME		= board_v2_2
 DEVICE          = gd32f303cc_nofpu
 
 
-OBJS			+= main2.o $(BOARDNAME)/board.o vna_measurement.o xpt2046.o uihw.o common.o synthesizers.o gitversion.hpp
-OBJS			+= globals.o ui.o flash.o plot.o ili9341.o Font5x7.o Font7x13b.o numfont20x22.o fft.o command_parser.o stream_fifo.o
+OBJS			+= main2.o $(BOARDNAME)/board.o vna_measurement.o common.o synthesizers.o gitversion.hpp
+OBJS			+= globals.o flash.o command_parser.o stream_fifo.o
 OBJS			+= sin_rom.o gain_cal.o
 OBJS            += $(MCULIB)/message_log.o $(MCULIB)/printf.o $(MCULIB)/fastwiring.o $(MCULIB)/si5351.o $(MCULIB)/dma_adc.o $(MCULIB)/dma_driver.o $(MCULIB)/usbserial.o
 
@@ -18,7 +18,7 @@ CPPFLAGS		+= -Wall -Wno-unused-function
 #CPPFLAGS		+= -DDISPLAY_ST7796
 CPPFLAGS		+=  -ffunction-sections -fdata-sections
 #C++ only flags, CPP is used for both C++ and C files
-CXXFLAGS		+= --std=c++17 -fno-exceptions -fno-rtti
+CXXFLAGS		+= -std=c++17 -fno-exceptions -fno-rtti
 
 # safe g++ flags
 CPPFLAGS		+= -funsigned-char -fwrapv -fno-delete-null-pointer-checks -fno-strict-aliasing
