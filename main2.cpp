@@ -86,8 +86,8 @@ static volatile int usbTxQueueWPos = 0;
 static volatile int usbTxQueueRPos = 0;
 
 
-static uint16_t ADCValueQueue[256];
-static constexpr int ADCValueQueueMask = 255;
+static uint16_t ADCValueQueue[8192];
+static constexpr int ADCValueQueueMask = 8191;
 static volatile int ADCValueQueueWPos = 0;
 static volatile int ADCValueQueueRPos = 0;
 
@@ -257,7 +257,8 @@ static void updateIFrequency(freqHz_t txFreqHz) {
 static void setFrequency(freqHz_t freqHz) {
 	currFreqHz = freqHz;
 	updateIFrequency(freqHz);
-	rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(measurementGetDefaultGain(currFreqHz)));
+	if(!outputRawSamples)	
+		rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(measurementGetDefaultGain(currFreqHz)));
 
 	// use adf4350 for f > 140MHz
 	if(is_freq_for_adf4350(freqHz)) {
@@ -463,7 +464,7 @@ static void cmdReadFIFO(int address, int nValues)
 	if(address == 0x31)
 	{
 		uint8_t txbuf[2];
-		for(int i=0; i<nValues;) 
+		for(int i=0; i<nValues*16;) 
 		{
 			int rdRPos = ADCValueQueueRPos;
 			int rdWPos = ADCValueQueueWPos;
@@ -625,6 +626,12 @@ static void cmdRegisterWrite(int address) {
 		else if(val == 5)
 			measurementPhaseChanged(VNAMeasurementPhases::ECALSHORT);
 	}
+	if(address == 0x32)
+	{
+		auto val = registers[0x32];
+		if(val >= 0 &&  val <= 3)
+			rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(val));
+	}
 }
 
 
@@ -659,7 +666,8 @@ static int measurementGetDefaultGain(freqHz_t freqHz) {
 }
 // callback called by VNAMeasurement to change rf switch positions.
 static void measurementPhaseChanged(VNAMeasurementPhases ph) {
-	rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(measurementGetDefaultGain(currFreqHz)));
+	if(!outputRawSamples)
+		rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(measurementGetDefaultGain(currFreqHz)));
 	switch(ph) {
 		case VNAMeasurementPhases::REFERENCE:
 			rfsw(RFSW_REFL, RFSW_REFL_ON);
@@ -773,25 +781,6 @@ static void adc_process() {
 		if(!outputRawSamples)
 			vnaMeasurement.processSamples((uint16_t*)buf, len);
 	}
-}
-
-static int cnt = 0;
-static void usb_transmit_rawSamples() {
-	volatile uint16_t* buf;
-	int len;
-	adc_read(buf, len);
-	int8_t tmpBuf[adcBufSize];
-	for(int i=0; i<len; i++)
-		tmpBuf[i] = int8_t(buf[i] >> 4) - 128;
-	serial.print((char*)tmpBuf, len);
-
-	cnt += len;
-
-	rfsw(RFSW_ECAL, RFSW_ECAL_NORMAL);
-	rfsw(RFSW_RECV, ((cnt / 500) % 2) ? RFSW_RECV_REFL : RFSW_RECV_PORT2);
-	//rfsw(RFSW_REFL, ((cnt / 500) % 2) ? RFSW_REFL_ON : RFSW_REFL_OFF);
-	//rfsw(RFSW_RECV, RFSW_RECV_REFL);
-	rfsw(RFSW_REFL, RFSW_REFL_ON);
 }
 
 /* Return true when FPU is available */
