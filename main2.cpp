@@ -85,6 +85,12 @@ static constexpr int usbTxQueueMask = 255;
 static volatile int usbTxQueueWPos = 0;
 static volatile int usbTxQueueRPos = 0;
 
+
+static uint16_t ADCValueQueue[256];
+static constexpr int ADCValueQueueMask = 255;
+static volatile int ADCValueQueueWPos = 0;
+static volatile int ADCValueQueueRPos = 0;
+
 // periods of a 1MHz clock; how often to call adc_process()
 static constexpr int tim1Period = 25;	// 1MHz / 25 = 40kHz
 
@@ -402,6 +408,10 @@ For a description of the command interface see command_parser.hpp
 -- 26: dataMode: 0 => VNA data, 1 => raw data, 2 => exit usb data mode
 -- 30: valuesFIFO - returns data points; elements are 32-byte. See below for data format.
 --                  command 0x14 reads FIFO data; writing any value clears FIFO.
+-- 31: RFSW state
+	- 0: reference
+	- 1: rx port 1
+	- 2: rx port 2
 -- f0: device variant (01)
 -- f1: protocol version (01)
 -- f2: hardware revision
@@ -448,14 +458,34 @@ For a description of the command interface see command_parser.hpp
 */
 
 
-static void cmdRegisterWrite(int address);
+static void cmdReadFIFO(int address, int nValues) 
+{
+	if(address == 0x31)
+	{
+		uint8_t txbuf[2];
+		for(int i=0; i<nValues;) 
+		{
+			int rdRPos = ADCValueQueueRPos;
+			int rdWPos = ADCValueQueueWPos;
+			__sync_synchronize();
 
-//1425tX^^^^^^^^^^^^^^XXXXXXXXXXXXXXXXXXXXXXMMMMMM%Vc222$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$44443 \uuuuuuuuuuuuiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiyhz<ggggggggggggggggggggggggggggggggggg
+			if(rdRPos == rdWPos)  // queue empty
+				continue;
 
+			txbuf[0]=uint8_t(ADCValueQueue[rdRPos]  >>0);
+			txbuf[1]=uint8_t(ADCValueQueue[rdRPos]  >>8);
 
-static void cmdReadFIFO(int address, int nValues) {
-	if(address != 0x30) return;
+			ADCValueQueueRPos = (rdRPos + 1) & ADCValueQueueMask;
+			i++;		
+			if(!serialSendTimeout((char*)txbuf, sizeof(txbuf), 1500)) // max number of bytes seems to be 0x1f
+				return;
+		}
+		return;
+	}
 
+	if(address != 0x30) 
+		return;	
+	
 	for(int i=0; i<nValues;) {
 		int rdRPos = usbTxQueueRPos;
 		int rdWPos = usbTxQueueWPos;
@@ -549,9 +579,16 @@ static void setVNASweepToUSB() {
 	vnaMeasurement.sweepPoints = points;
 	vnaMeasurement.resetSweep();
 }
+
+static void measurementPhaseChanged(VNAMeasurementPhases ph);
+
 static void cmdRegisterWrite(int address) {
-	if(address == 0x00 || address == 0x10 || address == 0x20 || address == 0x22) {
+	if(address == 0x00 || address == 0x10 || address == 0x20 || address == 0x22) 
 		setVNASweepToUSB();
+	if(address == 0x00)
+	{
+		//freqHz_t f = (freqHz_t)*(uint64_t*)(registers + 0x00);
+		setFrequency((freqHz_t)*(uint64_t*)(registers + 0x00));
 	}
 	if(address == 0x26) {
 		auto val = registers[0x26];
@@ -569,7 +606,24 @@ static void cmdRegisterWrite(int address) {
 		vnaMeasurement.nPeriods = MEASUREMENT_NPERIODS_CALIBRATING;
 	}
 	if(address == 0x30) {
-		usbTxQueueRPos = usbTxQueueWPos;
+		ADCValueQueueRPos = ADCValueQueueWPos; // clear ADCValueQueue
+		usbTxQueueRPos = usbTxQueueWPos; // clear usbTxQueue
+	}
+	if(address == 0x31) 
+	{
+		auto val = registers[0x31];
+		if(val == 0)
+			measurementPhaseChanged(VNAMeasurementPhases::REFERENCE);
+		else if(val == 1)
+			measurementPhaseChanged(VNAMeasurementPhases::REFL);
+		else if(val == 2)
+			measurementPhaseChanged(VNAMeasurementPhases::THRU);
+		else if(val == 3)
+			measurementPhaseChanged(VNAMeasurementPhases::ECALTHRU);
+		else if(val == 4)
+			measurementPhaseChanged(VNAMeasurementPhases::ECALLOAD);
+		else if(val == 5)
+			measurementPhaseChanged(VNAMeasurementPhases::ECALSHORT);
 	}
 }
 
@@ -650,7 +704,7 @@ static void measurementEmitDataPoint(int freqIndex, freqHz_t freqHz, VNAObservat
 	__sync_synchronize();
 	if(((wrWPos + 1) & usbTxQueueMask) == wrRPos) {
 		// overflow
-		//while(true);
+		// discard value
 	} 
 	else {
 		usbTxQueue[wrWPos].freqIndex = freqIndex;
@@ -694,13 +748,30 @@ static void measurement_setup() {
 }
 
 static void adc_process() {
-	if(!outputRawSamples) {
-		volatile uint16_t* buf;
-		int len;
-		for(int i=0; i<2; i++) {
-			adc_read(buf, len);
-			vnaMeasurement.processSamples((uint16_t*)buf, len);
+	volatile uint16_t* buf;
+	int len;
+	for(int i=0; i<2; i++) {
+		adc_read(buf, len);
+		for(int k=0;k<len;k++)
+		{
+			int wrWPos = ADCValueQueueWPos;
+			int wrRPos = ADCValueQueueRPos;
+			__sync_synchronize();			
+			if(((wrWPos + 1) & ADCValueQueueMask) == wrRPos) 
+			{
+				// overflow
+				// discard value
+				break;
+			} 			
+			else
+			{
+				ADCValueQueue[ADCValueQueueWPos] = buf[k];
+				__sync_synchronize();				
+				ADCValueQueueWPos = (ADCValueQueueWPos + 1) & ADCValueQueueMask;				
+			}
 		}
+		if(!outputRawSamples)
+			vnaMeasurement.processSamples((uint16_t*)buf, len);
 	}
 }
 
@@ -844,8 +915,8 @@ int main(void) {
 		// process any outstanding commands from usb
 		cmdInputFIFO.drain();
 		
-		if(outputRawSamples)
-			usb_transmit_rawSamples();
+		//if(outputRawSamples)
+//			usb_transmit_rawSamples();
 	}
 }
 
