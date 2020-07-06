@@ -14,7 +14,7 @@ function testLeanVNA
     
     write(s,[0x20 0x26 0x01],"uint8")
     
-    write(s,[0x20 0x32 0x00],"uint8")  % set gain
+    write(s,[0x20 0x32 0x02],"uint8")  % set gain
     
     calculateBBGain();
     
@@ -33,10 +33,18 @@ function testLeanVNA
     Fs=300000; % sample rate of ADC is 300 kHz
     numValues = 512;
     
+    sinTable12000 = generateSinTable(Fs,numValues,12000);
+    generateSinTable(Fs,numValues,12000);
+    
     for f = fStart:(fEnd-fStart)/(nPoints-1):fEnd
         frequency = uint64(f);
         disp("freq: " + int2str(f));
         write(s,[0x23 0x0 typecast(frequency, 'uint8')],'uint8');
+        if f >= 100000
+            loFreq = 12000;
+        else
+            loFreq = 6000;
+        end
         adcVals2 = zeros(3,numValues);
         ifAmplitude = zeros(3,1);
         figure(fig1);
@@ -64,20 +72,31 @@ function testLeanVNA
             title(switchDescription(i));
             ylim([-32700 32700])
 
-            Y=fft(adcVals2(i,:)/numValues);
-            P2=abs(Y);
-            P1 = P2(1:numValues/2+1);
-            P1(2:end-1) = 2*P1(2:end-1);
-            
             %%
-            % take amplitude at intermediate frequency 11.72 kHz
-            ifIndex = round(11720/(Fs/numValues));
-            ifAmplitude(i) = P1(ifIndex);
+            % FFT
+            %Y=fft(adcVals2(i,:)/numValues);
+            %P2=abs(Y);
+            %P1 = P2(1:numValues/2+1);
+            %P1(2:end-1) = 2*P1(2:end-1);            
             
-            %%
+            % take amplitude at intermediate frequency 12.0 kHz
+            
+            %ifIndex = round(loFreq/(Fs/numValues));
+            %ifAmplitude(i) = P1(ifIndex);
+
+            %subplot(2,3,i+3)
+            %P1(1)=0; % remove DC part
+            %plot(0:(Fs/numValues):(Fs/2-Fs/numValues),P1(1:numValues/2))
+
+            
+            P1 = sinTable12000(2,:)*adcVals2(i,:)' / numValues^2 + i*sinTable12000(1,:)*adcVals2(i,:)' / numValues^2;
+            ifAmplitude(i) = abs(P1);
             subplot(2,3,i+3)
-            P1(1)=0; % remove DC part
-            plot(0:(Fs/numValues):(Fs/2-Fs/numValues),P1(1:numValues/2))
+            bar(abs(P1));
+            ylim([0 2]);
+            
+
+            %%
             
         end
         figure(fig2);
@@ -93,6 +112,14 @@ function testLeanVNA
 end
 
 
+function sinTable = generateSinTable(Fs,n,lo)
+    n_period = Fs/lo;
+    sinTable=0;
+    for i=1:n
+        sinTable(1,i) = sin(i*2*pi/n_period);
+        sinTable(2,i) = cos(i*2*pi/n_period);
+    end
+end
 
 function calculateBBGain 
 end
