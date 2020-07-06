@@ -21,10 +21,6 @@ extern volatile bool sweep_enabled;
 extern int16_t vbat;
 
 extern int16_t lastsaveid;
-extern properties_t *active_props;
-extern properties_t current_props;
-
-extern int8_t previous_marker;
 
 
 extern config_t config;
@@ -45,8 +41,6 @@ enum EcalStates {
 };
 extern volatile EcalStates ecalState;
 
-extern uistat_t uistat;
-
 #define frequency0 current_props._frequency0
 #define frequency1 current_props._frequency1
 #define sweep_points current_props._sweep_points
@@ -61,20 +55,5 @@ extern uistat_t uistat;
 #define domain_mode current_props._domain_mode
 #define velocity_factor current_props._velocity_factor
 #define marker_smith_format current_props._marker_smith_format
-
-
-
-static inline float get_trace_refpos(int t) {
-  return trace[t].refpos;
-}
-
-
-static inline float get_trace_scale(int t) {
-  return trace[t].scale * trace_info[trace[t].type].scale_unit;
-}
-
-static inline const char* get_trace_typename(int t) {
-  return trace_info[trace[t].type].name;
-}
 
 

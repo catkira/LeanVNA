@@ -116,103 +116,15 @@ constexpr int MEASUREMENT_NPERIODS_CALIBRATING = 30;
 constexpr int MEASUREMENT_ECAL_INTERVAL = 5;
 
 
-// TODO: name all enums and refer to them by name
-
-enum {
-  TRC_LOGMAG, TRC_PHASE, TRC_DELAY, TRC_SMITH, TRC_POLAR, TRC_LINEAR, TRC_SWR, TRC_REAL, TRC_IMAG, TRC_R, TRC_X, TRC_OFF
-};
-
-enum SweepParameter {
-  ST_START, ST_STOP, ST_CENTER, ST_SPAN, ST_CW
-};
-
-// lever_mode
-enum {
-  LM_MARKER, LM_SEARCH, LM_CENTER, LM_SPAN
-};
-
-// marker smith value format
-enum {
-  MS_LIN, MS_LOG, MS_REIM, MS_RX, MS_RLC
-};
-
-enum MarkerSearchModes: uint8_t {
-	Min,
-	Max
-};
-
-enum {
-	UI_OPTIONS_FLIP = 1
-};
-
-
-typedef struct {
-  uint8_t enabled;
-  uint8_t type;
-  uint8_t channel;
-  uint8_t polar;
-  float scale;
-  float refpos;
-} trace_t;
-
-typedef struct {
-  int8_t enabled;
-  int16_t index;
-  freqHz_t frequency;
-} marker_t;
-
-struct alignas(4) properties_t {
-  uint32_t magic;
-  freqHz_t _frequency0; // start
-  freqHz_t _frequency1; // stop
-  int16_t _sweep_points;
-  uint16_t _cal_status;
-
-  complexf _cal_data[6][SWEEP_POINTS_MAX];
-  float _electrical_delay; // picoseconds
-  
-  trace_t _trace[TRACES_MAX];
-  marker_t _markers[MARKERS_MAX];
-  float _velocity_factor; // %
-  int _active_marker;
-  uint8_t _domain_mode; /* 0bxxxxxffm : where ff: TD_FUNC m: DOMAIN_MODE */
-  uint8_t _marker_smith_format;
-
-  int32_t checksum;
-
-  // overwrite all fields of this instance with factory default values
-  void setFieldsToDefault();
-
-  properties_t() { setFieldsToDefault(); }
-};
 
 
 typedef struct {
   uint32_t magic;
   uint16_t dac_value; // unused
-  uint16_t grid_color;
-  uint16_t menu_normal_color;
-  uint16_t menu_active_color;
-  uint16_t trace_color[TRACES_MAX];
-  int16_t touch_cal[4];
-  int8_t default_loadcal;
-  uint32_t harmonic_freq_threshold; // unused
-  int8_t ui_options;
   int32_t checksum;
 } config_t;
 
-struct uistat_t {
-  int8_t digit; /* 0~5 */
-  int8_t digit_mode;
-  int8_t current_trace; /* 0..3 */
-  int64_t value; // for editing at numeric input area
-  int64_t previous_value;
-  uint8_t lever_mode;
-  int8_t previous_marker;
-  MarkerSearchModes marker_search_mode;
-  bool marker_tracking;
-  bool marker_delta;
-};
+
 
 #define CONFIG_MAGIC 0x80081235
 
@@ -231,30 +143,6 @@ static inline uint8_t vbat2bati(int16_t vbat)
 	if (vbat < 4100) return 75;
 	return 100;
 }
-
-
-
-static const struct {
-  const char *name;
-  uint16_t refpos;
-  float scale_unit;
-} trace_info[] = {
-  { "LOGMAG", 7, 10 },
-  { "PHASE",  4, 90 },
-  { "DELAY",  4,  1 },
-  { "SMITH",  0,  1 },
-  { "POLAR",  0,  1 },
-  { "LINEAR", 0,  0.125 },
-  { "SWR",    0,  1 },
-  { "REAL",   4,  0.25 },
-  { "IMAG",   4,  0.25 },
-  { "R",      0, 100 },
-  { "X",      4, 100 }
-};
-
-static const char * const trc_channel_name[] = {
-  "CH0", "CH1"
-};
 
 
 float my_atof(const char *p);

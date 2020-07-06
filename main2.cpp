@@ -80,8 +80,8 @@ struct usbDataPoint {
 	VNAObservation value;
 	int freqIndex;
 };
-static usbDataPoint usbTxQueue[64];
-static constexpr int usbTxQueueMask = 63;
+static usbDataPoint usbTxQueue[256];
+static constexpr int usbTxQueueMask = 255;
 static volatile int usbTxQueueWPos = 0;
 static volatile int usbTxQueueRPos = 0;
 
@@ -640,83 +640,19 @@ static void measurementEmitDataPoint(int freqIndex, freqHz_t freqHz, VNAObservat
 	digitalWrite(led, vnaMeasurement.clipFlag?1:0);
 
 	v[2] *= gainTable[currThruGain] / gainTable[measurementGetDefaultGain(freqHz)];
-
 	v[2] = applyFixedCorrectionsThru(v[2], freqHz);
 	v[0] = applyFixedCorrections(v[0]/v[1], freqHz) * v[1];
 
-	int ecalIgnoreValues2 = ecalIgnoreValues;
-	if(ecalIgnoreValues2 != 0) {
-		ecal = nullptr;
-		__sync_bool_compare_and_swap(&ecalIgnoreValues, ecalIgnoreValues2, ecalIgnoreValues2-1);
-	}
-
-	if(ecal != nullptr) {
-		complexf scale = complexf(1., 0.)/v[1];
-		auto ecal0 = applyFixedCorrections(ecal[0] * scale, freqHz);
-
-		if(collectMeasurementType >= 0) {
-			// we are collecting a measurement for calibration
-			measuredEcal[0][freqIndex] = ecal0;
-#ifndef ECAL_PARTIAL
-			measuredEcal[1][freqIndex] = ecal[1] * scale;
-			measuredEcal[2][freqIndex] = ecal[2] * scale;
-#endif
-
-			current_props._cal_data[collectMeasurementType][freqIndex] = ecalApplyReflection(v[0]/v[1], freqIndex);
-
-			auto tmp = v[2]/v[1];
-			if(collectMeasurementType == CAL_OPEN)
-				current_props._cal_data[CAL_ISOLN_OPEN][freqIndex] = tmp;
-			else if(collectMeasurementType == CAL_SHORT)
-				current_props._cal_data[CAL_ISOLN_SHORT][freqIndex] = tmp;
-			else if(collectMeasurementType == CAL_THRU)
-				current_props._cal_data[CAL_THRU][freqIndex] = tmp;
-
-			if(collectMeasurementState == 0) {
-				collectMeasurementState = 1;
-				collectMeasurementOffset = freqIndex;
-			} else if(collectMeasurementState == 1 && collectMeasurementOffset == freqIndex) {
-				collectMeasurementState = 2;
-				collectMeasurementOffset += 2;
-				if(collectMeasurementOffset >= vnaMeasurement.sweepPoints)
-					collectMeasurementOffset -= vnaMeasurement.sweepPoints;
-			} else if(collectMeasurementState == 2 && collectMeasurementOffset == freqIndex) {
-				collectMeasurementState = 0;
-				collectMeasurementType = -1;
-				eventQueue.enqueue(collectMeasurementCB);
-			}
-		} else {
-			if(ecalState == ECAL_STATE_DONE) {
-				scale *= 0.2f;
-				measuredEcal[0][freqIndex] = measuredEcal[0][freqIndex] * 0.8f + ecal0 * 0.2f;
-				#ifndef ECAL_PARTIAL
-					measuredEcal[1][freqIndex] = measuredEcal[1][freqIndex] * 0.8f + ecal[1] * scale;
-					measuredEcal[2][freqIndex] = measuredEcal[2][freqIndex] * 0.8f + ecal[2] * scale;
-				#endif
-			} else {
-				measuredEcal[0][freqIndex] = ecal0;
-				#ifndef ECAL_PARTIAL
-					measuredEcal[1][freqIndex] = ecal[1] * scale;
-					measuredEcal[2][freqIndex] = ecal[2] * scale;
-				#endif
-			}
-			if(ecalState == ECAL_STATE_MEASURING
-					&& freqIndex == vnaMeasurement.sweepPoints - 1) {
-				ecalState = ECAL_STATE_2NDSWEEP;
-			} else if(ecalState == ECAL_STATE_2NDSWEEP) {
-				ecalState = ECAL_STATE_DONE;
-				vnaMeasurement.ecalIntervalPoints = MEASUREMENT_ECAL_INTERVAL;
-				vnaMeasurement.nPeriods = MEASUREMENT_NPERIODS_NORMAL;
-			}
-		}
-	}
+	
 	// enqueue new data point
 	int wrRPos = usbTxQueueRPos;
 	int wrWPos = usbTxQueueWPos;
 	__sync_synchronize();
 	if(((wrWPos + 1) & usbTxQueueMask) == wrRPos) {
 		// overflow
-	} else {
+		//while(true);
+	} 
+	else {
 		usbTxQueue[wrWPos].freqIndex = freqIndex;
 		usbTxQueue[wrWPos].value = v;
 		__sync_synchronize();
@@ -786,73 +722,6 @@ static void usb_transmit_rawSamples() {
 	//rfsw(RFSW_RECV, RFSW_RECV_REFL);
 	rfsw(RFSW_REFL, RFSW_REFL_ON);
 }
-
-
-static void apply_edelay(int i, complexf& refl, complexf& thru) {
-	float w = 2 * M_PI * electrical_delay * UIActions::frequencyAt(i) * 1E-12;
-	complexf s = polar(1.f, w);
-	refl *= s;
-	thru *= s;
-}
-
-// consume all items in the values fifo and update the "measured" array.
-static bool processDataPoint() {
-	int rdRPos = usbTxQueueRPos;
-	int rdWPos = usbTxQueueWPos;
-	__sync_synchronize();
-
-	while(rdRPos != rdWPos) {
-		usbDataPoint& usbDP = usbTxQueue[rdRPos];
-		VNAObservation& value = usbDP.value;
-		int freqIndex = usbDP.freqIndex;
-		auto refl = value[0]/value[1];
-		auto thru = value[2]/value[1];// - measuredEcal[2][freqIndex]*0.8f;
-
-		refl = ecalApplyReflection(refl, freqIndex);
-		if(current_props._cal_status & CALSTAT_APPLY) {
-			// apply thru leakage correction
-			auto x1 = current_props._cal_data[CAL_SHORT][freqIndex],
-				y1 = current_props._cal_data[CAL_ISOLN_SHORT][freqIndex],
-				x2 = current_props._cal_data[CAL_OPEN][freqIndex],
-				y2 = current_props._cal_data[CAL_ISOLN_OPEN][freqIndex];
-			auto cal_thru_leak_r = (y1-y2)/(x1-x2);
-			auto cal_thru_leak = y2-cal_thru_leak_r*x2;
-			thru = thru - (cal_thru_leak + refl*cal_thru_leak_r);
-
-			// apply thru response correction
-			if(current_props._cal_status & CALSTAT_THRU) {
-				auto refThru = current_props._cal_data[CAL_THRU][freqIndex];
-				//refThru = refThru - (cal_thru_leak + refl*cal_thru_leak_r);
-				// TODO: we can't do proper leakage correction on the reference thru measurement
-				// because we didn't store the S11 of the thru calibration. In V2 hardware
-				// this causes ~0.05dB of S21 error but it will be a problem if attempting
-				// to use this code with low-spec hardware with lots of leakage.
-				refThru = refThru - (cal_thru_leak + refl*cal_thru_leak_r);
-				thru = thru / refThru;
-			}
-
-			// apply reflection correction
-			refl = SOL_compute_reflection(
-						current_props._cal_data[CAL_SHORT][freqIndex],
-						current_props._cal_data[CAL_OPEN][freqIndex],
-						current_props._cal_data[CAL_LOAD][freqIndex],
-						refl);
-		}
-		apply_edelay(usbDP.freqIndex, refl, thru);
-		measuredFreqDomain[0][usbDP.freqIndex] = refl;
-		measuredFreqDomain[1][usbDP.freqIndex] = thru;
-		if ((domain_mode & DOMAIN_MODE) == DOMAIN_FREQ) {
-			measured[0][usbDP.freqIndex] = refl;
-			measured[1][usbDP.freqIndex] = thru;
-		}
-
-		rdRPos = (rdRPos + 1) & usbTxQueueMask;
-		usbTxQueueRPos = rdRPos;
-
-	}
-	return false;
-}
-
 
 /* Return true when FPU is available */
 bool cpu_enable_fpu(void)
@@ -949,7 +818,6 @@ int main(void) {
 	if(!synthesizers::si5351_setup()) {
 		printk1("ERROR: si5351 init failed\n");
 		printk1("Touch anywhere to continue...\n");
-		current_props._frequency0 = 200000000;
 		//show_dmesg();
 	}
 
