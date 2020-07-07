@@ -465,7 +465,7 @@ static void cmdReadFIFO(int address, int nValues)
 	{
 		const int txBufSize=0x3f;
 		uint8_t txbuf[txBufSize];
-		uint32_t valuesLeft = nValues*16;
+		uint32_t valuesLeft = nValues*64;
 		while(valuesLeft > 0)
 		{
 			int i=0;

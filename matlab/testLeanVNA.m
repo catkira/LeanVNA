@@ -4,8 +4,9 @@ function testLeanVNA
     clear global
     global Fs numValues s sinTable loFreq S21
 
-    numValues = 2048;
+    numValues = 16000;
     Fs=300000; % sample rate of ADC is 300 kHz
+    nAverages = 5;
     fStart = 20E6;
     fEnd = 1E9;
     nPoints = 100;
@@ -48,38 +49,45 @@ function testLeanVNA
             loFreq = 6000;
         end
         sinTable = generateSinTable(Fs,numValues,loFreq);
-        adcVals2 = zeros(3,numValues);
-        ifAmplitude = zeros(3,1);
-        figure(fig1);
-        for i = 1:3
+        
+        for k = 1:nAverages
+            adcVals2 = zeros(3,numValues);
+            ifAmplitude = zeros(3,1);
+            figure(fig1);
+            for i = 1:3
 
-            subplot(2,3,i)
-            selectPath(i);
-            pause(0.1)
-            clearFifo();
-            flush(s);    
+                subplot(2,3,i)
+                selectPath(i);
+                pause(0.1)
+                clearFifo();
+                flush(s);    
 
-            adcVals2(i,:)=readADC(numValues);
-            if abs(max(adcVals2(i,:))) > 30000
-                disp("clipping!")
+                adcVals2(i,:)=readADC(numValues);
+                if abs(max(adcVals2(i,:))) > 30000
+                    disp("clipping!")
+                end
+                adcVals2(i,:) = kaiser(length(adcVals2),5)'.*adcVals2(i,:);
+                plot(adcVals2(i,:));
+                title(switchDescription(i));
+                ylim([-32700 32700])
+
+                ifAmplitude(i)=calculateIFAmplitude(adcVals2(i,:));
+                subplot(2,3,i+3)
+                bar(ifAmplitude(i));
+                ylim([0 32000]);   
+
             end
-            adcVals2(i,:) = kaiser(length(adcVals2),5)'.*adcVals2(i,:);
-            plot(adcVals2(i,:));
-            title(switchDescription(i));
-            ylim([-32700 32700])
-
-            ifAmplitude(i)=calculateIFAmplitude(adcVals2(i,:));
-            subplot(2,3,i+3)
-            bar(ifAmplitude(i));
-            ylim([0 32000]);   
-            
+            if k == 1
+                S21(fIndex) = ifAmplitude(3)/ifAmplitude(1)/transNorm(fIndex);
+            else
+                S21(fIndex) = (S21(fIndex) + ifAmplitude(3)/ifAmplitude(1)/transNorm(fIndex))/2;
+            end
+            figure(fig2);
+            plot(fStart:(fEnd-fStart)/(nPoints-1):fEnd,20*log10(S21));
+            ylim([-100 10]);
+            ylabel('S21 (dB)')
+            xlabel('f (Hz)')
         end
-        figure(fig2);
-        S21(fIndex) = ifAmplitude(3)/ifAmplitude(1)/transNorm(fIndex);
-        plot(fStart:(fEnd-fStart)/(nPoints-1):fEnd,20*log10(S21));
-        ylim([-100 10]);
-        ylabel('S21 (dB)')
-        xlabel('f (Hz)')
         fIndex = fIndex+1;
     end    
     
@@ -119,7 +127,7 @@ end
 
 function data = readADC(n)
     global s
-    write(s,[0x18 0x31 n/16],"uint8"); % read 255 values from adc, each values 2 bytes
+    write(s,[0x18 0x31 n/64],"uint8"); % read 255 values from adc, each values 2 bytes
     adcVals = zeros(1,n*2);
     %disp("waiting...")
     adcVals = read(s,n*2,"uint8");
