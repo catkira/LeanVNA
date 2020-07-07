@@ -4,9 +4,9 @@ function testLeanVNA
     clear global
     global Fs numValues s sinTable loFreq S21
 
-    numValues = 16000;
+    numValues = 2048;
     Fs=300000; % sample rate of ADC is 300 kHz
-    nAverages = 5;
+    nAverages = 1;
     fStart = 1E6;
     fEnd = 1E8;
     nPoints = 100;
@@ -79,7 +79,7 @@ function testLeanVNA
                 ylim([0 32000]);   
 
             end
-            tempS21(k) = ifAmplitude(3)/ifAmplitude(1)/transNorm(fIndex);
+            tempS21(k) = ifAmplitude(3)/ifAmplitude(1)/transNorm(fIndex)*deviceS21Correction(f);
             S21(fIndex) = sum(tempS21)/k;
             
             figure(fig2);
@@ -94,6 +94,15 @@ function testLeanVNA
     pause(1)
     frequency = uint64(100000000);
     write(s,[0x23 0x0 typecast(frequency, 'uint8')],'uint8')
+end
+
+% values from main2.cpp of nanoVNA V2
+function scale = deviceS21Correction(f)
+    scale = 0.5;
+    if f > 1900000000
+        x = (freq - 1900000000) / (4400000000 - 1900000000);
+        scale = scale * (1 - 0.8*x*(2 - x));
+    end
 end
 
 function a = calculateIFAmplitudeFFT(adcValues)
