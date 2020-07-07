@@ -7,8 +7,8 @@ function testLeanVNA
     numValues = 2048;
     Fs=300000; % sample rate of ADC is 300 kHz
     nAverages = 1;
-    fStart = 20E8;
-    fEnd = 21E8;
+    fStart = 20E7;
+    fEnd = 21E7;
     nPoints = 100;
 
     if ~exist('transNorm','var')
@@ -98,10 +98,6 @@ function testLeanVNA
         end
         fIndex = fIndex+1;
     end    
-    
-    pause(1)
-    frequency = uint64(100000000);
-    write(s,[0x23 0x0 typecast(frequency, 'uint8')],'uint8')
 end
 
 % values from main2.cpp of nanoVNA V2
