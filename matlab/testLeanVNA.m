@@ -50,6 +50,7 @@ function testLeanVNA
         end
         sinTable = generateSinTable(Fs,numValues,loFreq);
         
+        tempS21 = zeros(1,nAverages);
         for k = 1:nAverages
             adcVals2 = zeros(3,numValues);
             ifAmplitude = zeros(3,1);
@@ -77,11 +78,9 @@ function testLeanVNA
                 ylim([0 32000]);   
 
             end
-            if k == 1
-                S21(fIndex) = ifAmplitude(3)/ifAmplitude(1)/transNorm(fIndex);
-            else
-                S21(fIndex) = (S21(fIndex) + ifAmplitude(3)/ifAmplitude(1)/transNorm(fIndex))/2;
-            end
+            tempS21(k) = ifAmplitude(3)/ifAmplitude(1)/transNorm(fIndex);
+            S21(fIndex) = sum(tempS21)/k;
+            
             figure(fig2);
             plot(fStart:(fEnd-fStart)/(nPoints-1):fEnd,20*log10(S21));
             ylim([-100 10]);
