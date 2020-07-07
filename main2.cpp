@@ -463,23 +463,30 @@ static void cmdReadFIFO(int address, int nValues)
 {
 	if(address == 0x31)
 	{
-		uint8_t txbuf[2];
-		for(int i=0; i<nValues*16;) 
+		const int txBufSize=0x3f;
+		uint8_t txbuf[txBufSize];
+		uint32_t valuesLeft = nValues*16;
+		while(valuesLeft > 0)
 		{
-			int rdRPos = ADCValueQueueRPos;
-			int rdWPos = ADCValueQueueWPos;
-			__sync_synchronize();
+			int i=0;
+			while(i<(txBufSize/2) && i<valuesLeft) 
+			{
+				int rdRPos = ADCValueQueueRPos;
+				int rdWPos = ADCValueQueueWPos;
+				__sync_synchronize();
 
-			if(rdRPos == rdWPos)  // queue empty
-				continue;
+				if(rdRPos == rdWPos)  // queue empty
+					continue;
 
-			txbuf[0]=uint8_t(ADCValueQueue[rdRPos]  >>0);
-			txbuf[1]=uint8_t(ADCValueQueue[rdRPos]  >>8);
+				txbuf[2*i+0]=uint8_t(ADCValueQueue[rdRPos]  >>0);
+				txbuf[2*i+1]=uint8_t(ADCValueQueue[rdRPos]  >>8);
 
-			ADCValueQueueRPos = (rdRPos + 1) & ADCValueQueueMask;
-			i++;		
-			if(!serialSendTimeout((char*)txbuf, sizeof(txbuf), 1500)) // max number of bytes seems to be 0x1f
+				ADCValueQueueRPos = (rdRPos + 1) & ADCValueQueueMask;
+				i++;		
+			}
+			if(!serialSendTimeout((char*)txbuf, 2*i, 1500)) // max number of bytes seems to be 0x3f
 				return;
+			valuesLeft -= i;
 		}
 		return;
 	}

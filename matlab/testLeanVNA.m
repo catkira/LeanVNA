@@ -18,7 +18,7 @@ function testLeanVNA
         fclose(instrfind); 
         delete(instrfind);
     end
-    s = serialport('COM7',500000);
+    s = serialport('COM7',1000000);
     configureTerminator(s,"CR")
     write(s,0,"uint8")
     write(s,0x0d,"uint8")
@@ -121,7 +121,9 @@ function data = readADC(n)
     global s
     write(s,[0x18 0x31 n/16],"uint8"); % read 255 values from adc, each values 2 bytes
     adcVals = zeros(1,n*2);
+    %disp("waiting...")
     adcVals = read(s,n*2,"uint8");
+    %disp("data received.")
 
     data = zeros(1,n);
     for k = 1:n
