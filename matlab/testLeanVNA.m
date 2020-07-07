@@ -2,13 +2,13 @@
 
 function testLeanVNA
     clear global
-    global Fs numValues s sinTable loFreq S21
+    global Fs numValues s sinTable loFreq S21 S11
 
     numValues = 2048;
     Fs=300000; % sample rate of ADC is 300 kHz
     nAverages = 1;
-    fStart = 1E6;
-    fEnd = 1E8;
+    fStart = 20E8;
+    fEnd = 21E8;
     nPoints = 100;
 
     if ~exist('transNorm','var')
@@ -36,9 +36,11 @@ function testLeanVNA
         
     fig1=figure(1);
     fig2=figure(2);
+    fig3=figure(3);
     switchDescription = ["reference" "reflection" "through"];
     
     S21 = zeros(1,nPoints);
+    S11 = zeros(1,nPoints);
     fIndex=1;
     
     for f = fStart:(fEnd-fStart)/(nPoints-1):fEnd
@@ -52,6 +54,7 @@ function testLeanVNA
         adjustRxGain(f)
         
         tempS21 = zeros(1,nAverages);
+        tempS11 = zeros(1,nAverages);
         for k = 1:nAverages
             adcVals2 = zeros(3,numValues);
             ifAmplitude = zeros(3,1);
@@ -75,15 +78,20 @@ function testLeanVNA
 
                 ifAmplitude(i)=calculateIFAmplitude(adcVals2(i,:));
                 subplot(2,3,i+3)
-                bar(ifAmplitude(i));
+                bar(abs(ifAmplitude(i)));
                 ylim([0 32000]);   
 
             end
+            tempS11(k) = ifAmplitude(2)/ifAmplitude(1);
             tempS21(k) = ifAmplitude(3)/ifAmplitude(1)/transNorm(fIndex)*deviceS21Correction(f);
+            S11(fIndex) = sum(tempS11)/k;
             S21(fIndex) = sum(tempS21)/k;
             
             figure(fig2);
-            plot(fStart:(fEnd-fStart)/(nPoints-1):fEnd,20*log10(S21));
+            smithplot(S11);
+
+            figure(fig3);
+            plot(fStart:(fEnd-fStart)/(nPoints-1):fEnd,20*log10(abs(S21)));
             ylim([-100 10]);
             ylabel('S21 (dB)')
             xlabel('f (Hz)')
@@ -100,7 +108,7 @@ end
 function scale = deviceS21Correction(f)
     scale = 0.5;
     if f > 1900000000
-        x = (freq - 1900000000) / (4400000000 - 1900000000);
+        x = (f - 1900000000) / (4400000000 - 1900000000);
         scale = scale * (1 - 0.8*x*(2 - x));
     end
 end
@@ -109,7 +117,7 @@ function a = calculateIFAmplitudeFFT(adcValues)
     global Fs loFreq
     n = length(adcValues);
     Y=fft(adcValues)/n;
-    P2=abs(Y);
+    P2=Y;
     P1 = P2(1:n/2+1);
     P1(2:end-1) = 2*P1(2:end-1);            
 
@@ -121,8 +129,7 @@ end
 function a = calculateIFAmplitude(adcValues)
     global sinTable
     n = length(adcValues);
-    P1 = sinTable(2,:)*adcValues' / n + i*sinTable(1,:)*adcValues' / n;
-    a = abs(P1);
+    a = sinTable(2,:)*adcValues' / n + i*sinTable(1,:)*adcValues' / n;
 end
 
 function sinTable = generateSinTable(Fs,n,lo)
