@@ -7,8 +7,8 @@ function testLeanVNA
     numValues = 16000;
     Fs=300000; % sample rate of ADC is 300 kHz
     nAverages = 5;
-    fStart = 20E6;
-    fEnd = 1E9;
+    fStart = 1E6;
+    fEnd = 1E8;
     nPoints = 100;
 
     if ~exist('transNorm','var')
@@ -49,6 +49,7 @@ function testLeanVNA
             loFreq = 6000;
         end
         sinTable = generateSinTable(Fs,numValues,loFreq);
+        adjustRxGain(f)
         
         tempS21 = zeros(1,nAverages);
         for k = 1:nAverages
@@ -137,6 +138,18 @@ function data = readADC(n)
         data(k)=adcVals((k-1)*2+2)*255 + adcVals((k-1)*2 + 1);
     end
     data = data*16 - 32768;    
+end
+
+% values taken from main2.cpp of nanoVNA V2
+function adjustRxGain(f)
+    FREQUENCY_CHANGE_OVER = 140000000; % taken from common.hpp of nanoVNA V2
+    if f > 2500000000
+        setGain(2)
+    elseif f > FREQUENCY_CHANGE_OVER
+        setGain(1)
+    else
+        setGain(0)
+    end
 end
 
 function selectPath(i)
