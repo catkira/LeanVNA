@@ -1,7 +1,23 @@
 
 
 function testLeanVNA
-    %fclose(instrfind);
+    clear global
+    global Fs numValues s sinTable loFreq S21
+
+    numValues = 2048;
+    Fs=300000; % sample rate of ADC is 300 kHz
+    fStart = 20E6;
+    fEnd = 1E9;
+    nPoints = 100;
+
+    if ~exist('transNorm','var')
+        transNorm=ones(1,nPoints);
+    end
+    
+    if ~isempty(instrfind) 
+        fclose(instrfind); 
+        delete(instrfind);
+    end
     s = serialport('COM7',500000);
     configureTerminator(s,"CR")
     write(s,0,"uint8")
@@ -11,98 +27,59 @@ function testLeanVNA
         disp 'Error'
         return
     end
-    
-    write(s,[0x20 0x26 0x01],"uint8")
-    
-    write(s,[0x20 0x32 0x02],"uint8")  % set gain
+   
+    enterRawMode();
+    setGain(1);
     
     calculateBBGain();
-    
-    %frequency = uint64(1E9);
-    %write(s,[0x23 0x0 typecast(frequency, 'uint8')],'uint8')
-    
+        
     fig1=figure(1);
     fig2=figure(2);
     switchDescription = ["reference" "reflection" "through"];
     
-    fStart = 1E7;
-    fEnd = 1E9;
-    nPoints = 40;
     S21 = zeros(1,nPoints);
     fIndex=1;
-    Fs=300000; % sample rate of ADC is 300 kHz
-    numValues = 512;
-    
-    sinTable12000 = generateSinTable(Fs,numValues,12000);
-    generateSinTable(Fs,numValues,12000);
     
     for f = fStart:(fEnd-fStart)/(nPoints-1):fEnd
-        frequency = uint64(f);
-        disp("freq: " + int2str(f));
-        write(s,[0x23 0x0 typecast(frequency, 'uint8')],'uint8');
+        setFrequency(f)
         if f >= 100000
             loFreq = 12000;
         else
             loFreq = 6000;
         end
+        sinTable = generateSinTable(Fs,numValues,loFreq);
         adcVals2 = zeros(3,numValues);
         ifAmplitude = zeros(3,1);
         figure(fig1);
         for i = 1:3
 
             subplot(2,3,i)
-            write(s,[0x20 0x31 i-1],"uint8");
+            selectPath(i);
             pause(0.1)
-            write(s,[0x20 0x30 0],"uint8") %clear fifo
+            clearFifo();
             flush(s);    
 
-            write(s,[0x18 0x31 numValues/16],"uint8"); % read 255 values from adc, each values 2 bytes
-            adcVals = zeros(1,numValues*2);
-            adcVals = read(s,numValues*2,"uint8");
-
-            for k = 1:numValues
-                adcVals2(i,k)=adcVals((k-1)*2+2)*255 + adcVals((k-1)*2 + 1);
-            end
-            adcVals2(i,:) = adcVals2(i,:)*16 - 32768;
+            adcVals2(i,:)=readADC(numValues);
             if abs(max(adcVals2(i,:))) > 30000
                 disp("clipping!")
             end
-            adcVals2(i,:) = kaiser(length(adcVals2),300)'.*adcVals2(i,:);
+            adcVals2(i,:) = kaiser(length(adcVals2),5)'.*adcVals2(i,:);
             plot(adcVals2(i,:));
             title(switchDescription(i));
             ylim([-32700 32700])
 
-            %%
-            % FFT
-            %Y=fft(adcVals2(i,:)/numValues);
-            %P2=abs(Y);
-            %P1 = P2(1:numValues/2+1);
-            %P1(2:end-1) = 2*P1(2:end-1);            
-            
-            % take amplitude at intermediate frequency 12.0 kHz
-            
-            %ifIndex = round(loFreq/(Fs/numValues));
-            %ifAmplitude(i) = P1(ifIndex);
-
-            %subplot(2,3,i+3)
-            %P1(1)=0; % remove DC part
-            %plot(0:(Fs/numValues):(Fs/2-Fs/numValues),P1(1:numValues/2))
-
-            
-            P1 = sinTable12000(2,:)*adcVals2(i,:)' / numValues^2 + i*sinTable12000(1,:)*adcVals2(i,:)' / numValues^2;
-            ifAmplitude(i) = abs(P1);
+            ifAmplitude(i)=calculateIFAmplitude(adcVals2(i,:));
             subplot(2,3,i+3)
-            bar(abs(P1));
-            ylim([0 2]);
-            
-
-            %%
+            bar(ifAmplitude(i));
+            ylim([0 32000]);   
             
         end
         figure(fig2);
-        S21(fIndex) = ifAmplitude(3)/ifAmplitude(1);
+        S21(fIndex) = ifAmplitude(3)/ifAmplitude(1)/transNorm(fIndex);
         plot(fStart:(fEnd-fStart)/(nPoints-1):fEnd,20*log10(S21));
         ylim([-100 10]);
+        ylabel('S21 (dB)')
+        xlabel('f (Hz)')
         fIndex = fIndex+1;
     end    
     
@@ -111,6 +88,25 @@ function testLeanVNA
     write(s,[0x23 0x0 typecast(frequency, 'uint8')],'uint8')
 end
 
+function a = calculateIFAmplitudeFFT(adcValues)
+    global Fs loFreq
+    n = length(adcValues);
+    Y=fft(adcValues)/n;
+    P2=abs(Y);
+    P1 = P2(1:n/2+1);
+    P1(2:end-1) = 2*P1(2:end-1);            
+
+    % take amplitude at intermediate frequency loFreq
+    ifIndex = round(loFreq/(Fs/n))+1;
+    a = P1(ifIndex) + P1(ifIndex+1); % use 2 fft bins 
+end
+                        
+function a = calculateIFAmplitude(adcValues)
+    global sinTable
+    n = length(adcValues);
+    P1 = sinTable(2,:)*adcValues' / n + i*sinTable(1,:)*adcValues' / n;
+    a = abs(P1);
+end
 
 function sinTable = generateSinTable(Fs,n,lo)
     n_period = Fs/lo;
@@ -119,6 +115,46 @@ function sinTable = generateSinTable(Fs,n,lo)
         sinTable(1,i) = sin(i*2*pi/n_period);
         sinTable(2,i) = cos(i*2*pi/n_period);
     end
+end
+
+function data = readADC(n)
+    global s
+    write(s,[0x18 0x31 n/16],"uint8"); % read 255 values from adc, each values 2 bytes
+    adcVals = zeros(1,n*2);
+    adcVals = read(s,n*2,"uint8");
+
+    data = zeros(1,n);
+    for k = 1:n
+        data(k)=adcVals((k-1)*2+2)*255 + adcVals((k-1)*2 + 1);
+    end
+    data = data*16 - 32768;    
+end
+
+function selectPath(i)
+    global s
+    write(s,[0x20 0x31 i-1],"uint8");
+end
+
+function setGain(i)
+    global s
+    write(s,[0x20 0x32 uint8(i)],"uint8")  % set gain
+end
+
+function clearFifo()
+    global s
+    write(s,[0x20 0x30 0],"uint8") %clear fifo
+end
+
+function enterRawMode
+    global s
+    write(s,[0x20 0x26 0x01],"uint8");
+end
+
+function setFrequency(f)
+    global s
+    frequency = uint64(f);
+    disp("freq: " + int2str(f));
+    write(s,[0x23 0x0 typecast(frequency, 'uint8')],'uint8');
 end
 
 function calculateBBGain 
