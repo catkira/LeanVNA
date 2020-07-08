@@ -1,14 +1,54 @@
+#pragma once
 
 
-// nStreams specifies the number of interleaved streams in the incoming data.
-// emitValue_t must have the signature:
-// void(int32_t* re, int32_t* im)
-// where re and im point to arrays of size nStreams.
-template<class emitValue_t, int nStreams=1>
+template<class emitValue_t>
+class RawSampleProcessor {
+private:
+	uint16_t* sampleBuffer;
+
+public:
+	uint32_t accumPhase;
+
+	// integration time for each output value
+	int accumPeriod = 50;
+
+	// void emitValue(int32_t valRe, int32_t valIm)
+	emitValue_t emitValue;
+
+	RawSampleProcessor(const emitValue_t& cb, uint16_t* sampleBuffer): emitValue(cb), sampleBuffer(sampleBuffer) {}
+	void init() {
+		accumPhase = 0;
+	}
+	
+	
+
+	// len specifies the number of aggregates (i.e. when nStreams > 1,
+	// the number of words in the array must be len * nStreams).
+	// returns whether we completed a cycle.
+	bool process(uint16_t* samples, int len) {
+		uint16_t* end = samples+len;
+		while(samples < end) {
+
+			sampleBuffer[accumPhase]=*samples;
+		
+			// save sample in buffer
+			accumPhase++;
+			samples ++;
+			if(int(accumPhase) >= accumPeriod) {
+				emitValue(sampleBuffer, accumPhase);
+				accumPhase = 0;
+			}
+		}
+		return true;
+	}
+};
+
+
+template<class emitValue_t>
 class SampleProcessor {
 public:
 	uint32_t accumPhase;
-	int32_t accumRe[nStreams],accumIm[nStreams];
+	int32_t accumRe,accumIm;
 
 	// integration time for each output value
 	int accumPeriod = 50;
@@ -24,8 +64,7 @@ public:
 	SampleProcessor(const emitValue_t& cb): emitValue(cb) {}
 	void init() {
 		accumPhase = 0;
-		for(int streamNum = 0; streamNum < nStreams; streamNum++)
-			accumRe[streamNum] = accumIm[streamNum] = 0;
+		accumRe = accumIm = 0;
 		clipFlag = false;
 	}
 	void setCorrelationTable(const int16_t* table, int length) {
@@ -37,26 +76,24 @@ public:
 	// the number of words in the array must be len * nStreams).
 	// returns whether we completed a cycle.
 	bool process(uint16_t* samples, int len) {
-		uint16_t* end = samples+len*nStreams;
+		uint16_t* end = samples+len;
 		bool ret = false;
 		while(samples < end) {
 			int32_t lo_im = correlationTable[accumPhase*2];
 			int32_t lo_re = correlationTable[accumPhase*2 + 1];
-			for(int streamNum = 0; streamNum < nStreams; streamNum++) {
-				int16_t sample = int16_t((samples[streamNum])*16 - 32768);
-				if(sample > 30000) clipFlag = true;
-				if(sample < -30000) clipFlag = true;
-			
-				accumRe[streamNum] += lo_re*sample/256;
-				accumIm[streamNum] += lo_im*sample/256;
-			}
+
+			int16_t sample = int16_t((*samples)*16 - 32768);
+			if(sample > 30000 || sample < -30000) 
+				clipFlag = true;
+		
+			accumRe += lo_re*sample/256;
+			accumIm += lo_im*sample/256;
 			
 			accumPhase++;
-			samples += nStreams;
+			samples ++;
 			if(int(accumPhase) >= accumPeriod) {
 				emitValue(accumRe, accumIm);
-				for(int streamNum = 0; streamNum < nStreams; streamNum++)
-					accumRe[streamNum] = accumIm[streamNum] = 0;
+				accumRe = accumIm = 0;
 				accumPhase = 0;
 				ret = true;
 			}

@@ -4,16 +4,6 @@
 #include "sample_processor.hpp"
 
 
-enum class VNAMeasurementPhases {
-	REFERENCE,
-	REFL,
-	THRU,
-
-	ECALLOAD,
-	ECALSHORT,
-	ECALTHRU
-};
-
 // implements sweep, rf switch timing, and dsp for single-receiver
 // switched path VNAs (one receiver with switches to select reference,
 // reflected, and thru paths).
@@ -83,7 +73,7 @@ public:
 
 	struct _emitValue_t {
 		VNAMeasurement* m;
-		void operator()(int32_t* valRe, int32_t* valIm);
+		void operator()(int32_t valRe, int32_t valIm);
 	};
 
 	SampleProcessor<_emitValue_t> sampleProcessor;

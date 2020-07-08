@@ -7,7 +7,7 @@ BOARDNAME		= board_v2_2
 DEVICE          = gd32f303cc_nofpu
 
 
-OBJS			+= main2.o $(BOARDNAME)/board.o vna_measurement.o common.o synthesizers.o gitversion.hpp
+OBJS			+= main2.o $(BOARDNAME)/board.o vna_measurement.o raw_vna_measurement.o common.o synthesizers.o gitversion.hpp
 OBJS			+= globals.o flash.o command_parser.o stream_fifo.o
 OBJS			+= sin_rom.o gain_cal.o
 OBJS            += $(MCULIB)/message_log.o $(MCULIB)/printf.o $(MCULIB)/fastwiring.o $(MCULIB)/si5351.o $(MCULIB)/dma_adc.o $(MCULIB)/dma_driver.o $(MCULIB)/usbserial.o

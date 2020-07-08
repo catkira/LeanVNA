@@ -2,10 +2,10 @@
 
 function rxTest
     clear global
-    global Fs numValues s sinTable
+    global Fs s sinTable adcData adcData2
 
     Fs=300000; % sample rate of ADC is 300 kHz
-    numValues = 512;
+    numValues = 2048;
 
     if ~isempty(instrfind) 
         fclose(instrfind); 
@@ -25,35 +25,47 @@ function rxTest
     setGain(3);
     selectPath(3);
     setFrequency(1E9);
-    clearFifo();
 
-    data=0;
     j=1;
     x=0;
     loFreq = 12000;
-    sinTable = generateSinTable(Fs,numValues,loFreq);    
+    sinTable = generateSinTable(Fs,numValues,loFreq); 
+    adcData2 = zeros(3,numValues);
     while(1)
-        adcData = readADC(numValues);
-        clearFifo();
-        adcData = kaiser(length(adcData),5)'.*adcData;
-        amplitude = calculateIFAmplitude(adcData);      
-        data(j)=abs(amplitude)/32768;
+        collectData(numValues);
+        pause(0.01) % weird glitches with all bytes being 0 happen without this wait
+        adcData = readADC(numValues*3);
+        adcData2(1,:) = adcData(1:numValues);
+        adcData2(2,:) = adcData(1*numValues+1:2*numValues);
+        adcData2(3,:) = adcData(2*numValues+1:3*numValues);
+        
+        adcData2(1:3,:) = kaiser(length(adcData2),5)'.*adcData2(1:3,:);
+        amplitude = calculateIFAmplitude(adcData2(1:3,:));     
+        data(1:3,j)=abs(amplitude)/32768;
+
         x(j)=j;
         if(j>200)
             x1=x(j-200:j);
-            data1=data(j-200:j);
+            data1=data(:,j-200:j);
             xmin=j-200;
             xmax=j;
         else
             x1=x;
-            data1=data;
+            data1 = data;
             xmin=0;
             xmax=200;
         end
-
-        plot(x1,20*log10(data1));
+        figure(1)
+        plot(x1,20*log10(data1(1,:)))
+        hold on
+        plot(x1,20*log10(data1(2,:)));
+        plot(x1,20*log10(data1(3,:)));
+        hold off
         axis([xmin xmax -100 10]);
         drawnow;
+        figure(2)
+        plot(adcData2(3,:));
+        ylim([-32700 32700])        
         j=j+1;
     end
 end
@@ -130,6 +142,11 @@ end
 function setGain(i)
     global s
     write(s,[0x20 0x32 uint8(i)],"uint8")  % set gain
+end
+
+function collectData(i)
+    global s
+    write(s,[0x21 0x33 typecast(uint16(i), 'uint8')],"uint8")  % samplesPerPhase
 end
 
 function clearFifo()

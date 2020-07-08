@@ -115,6 +115,17 @@ constexpr int MEASUREMENT_NPERIODS_NORMAL = 14;
 constexpr int MEASUREMENT_NPERIODS_CALIBRATING = 30;
 constexpr int MEASUREMENT_ECAL_INTERVAL = 5;
 
+enum class VNAMeasurementPhases {
+	REFERENCE,
+	REFL,
+	THRU,
+
+	ECALLOAD,
+	ECALSHORT,
+	ECALTHRU,
+	
+	IDLE
+};
 
 
 

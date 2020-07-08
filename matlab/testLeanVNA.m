@@ -4,12 +4,12 @@ function testLeanVNA
     clear global
     global Fs numValues s sinTable loFreq S21 S11
 
-    numValues = 2048;
+    numValues = 2048; % max 2048
     Fs=300000; % sample rate of ADC is 300 kHz
     nAverages = 1;
-    fStart = 20E7;
-    fEnd = 21E7;
-    nPoints = 100;
+    fStart = 1E9;
+    fEnd = 1.5E9;
+    nPoints = 20;
 
     if ~exist('transNorm','var')
         transNorm=ones(1,nPoints);
@@ -20,7 +20,6 @@ function testLeanVNA
         delete(instrfind);
     end
     s = serialport('COM7',1000000);
-    configureTerminator(s,"CR")
     write(s,0,"uint8")
     write(s,0x0d,"uint8")
     data=read(s,1,"uint8");
@@ -31,7 +30,6 @@ function testLeanVNA
    
     enterRawMode();
     setGain(1);
-    
     calculateBBGain();
         
     fig1=figure(1);
@@ -45,6 +43,7 @@ function testLeanVNA
     
     for f = fStart:(fEnd-fStart)/(nPoints-1):fEnd
         setFrequency(f)
+        pause(0.05)
         if f >= 100000
             loFreq = 12000;
         else
@@ -57,33 +56,37 @@ function testLeanVNA
         tempS11 = zeros(1,nAverages);
         for k = 1:nAverages
             adcVals2 = zeros(3,numValues);
-            ifAmplitude = zeros(3,1);
             figure(fig1);
+            
+            collectData(numValues);
+            pause(0.01) % weird glitches with all bytes being 0 happen without this wait
+            adcData = readADC(numValues*3);
+            adcData2(1,:) = adcData(1:numValues);
+            adcData2(2,:) = adcData(1*numValues+1:2*numValues);
+            adcData2(3,:) = adcData(2*numValues+1:3*numValues);
+
+            adcData2(1:3,:) = kaiser(length(adcData2),5)'.*adcData2(1:3,:);
+            amplitude = calculateIFAmplitude(adcData2(1:3,:));     
             for i = 1:3
 
                 subplot(2,3,i)
                 selectPath(i);
                 pause(0.1)
-                clearFifo();
-                flush(s);    
 
-                adcVals2(i,:)=readADC(numValues);
                 if abs(max(adcVals2(i,:))) > 30000
                     disp("clipping!")
                 end
-                adcVals2(i,:) = kaiser(length(adcVals2),5)'.*adcVals2(i,:);
-                plot(adcVals2(i,:));
+                plot(adcData2(i,:));
                 title(switchDescription(i));
                 ylim([-32700 32700])
 
-                ifAmplitude(i)=calculateIFAmplitude(adcVals2(i,:));
                 subplot(2,3,i+3)
-                bar(abs(ifAmplitude(i)));
+                %bar(abs(amplitude(i)));
                 ylim([0 32000]);   
 
             end
-            tempS11(k) = ifAmplitude(2)/ifAmplitude(1);
-            tempS21(k) = ifAmplitude(3)/ifAmplitude(1)/transNorm(fIndex)*deviceS21Correction(f);
+            tempS21(k) = amplitude(3)/amplitude(1)/transNorm(fIndex)*deviceS21Correction(f);
+            tempS11(k) = amplitude(2)/amplitude(1);
             S11(fIndex) = sum(tempS11)/k;
             S21(fIndex) = sum(tempS21)/k;
             
@@ -98,6 +101,11 @@ function testLeanVNA
         end
         fIndex = fIndex+1;
     end    
+end
+
+function collectData(i)
+    global s
+    write(s,[0x21 0x33 typecast(uint16(i), 'uint8')],"uint8")  % samplesPerPhase
 end
 
 % values from main2.cpp of nanoVNA V2
@@ -139,7 +147,7 @@ end
 
 function data = readADC(n)
     global s
-    write(s,[0x18 0x31 n/64],"uint8"); % read 255 values from adc, each values 2 bytes
+    write(s,[0x18 0x31 uint8(n/64)],"uint8"); % read 255 values from adc, each values 2 bytes
     adcVals = zeros(1,n*2);
     %disp("waiting...")
     adcVals = read(s,n*2,"uint8");

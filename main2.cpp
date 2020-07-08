@@ -36,6 +36,7 @@
 #include "globals.hpp"
 #include "synthesizers.hpp"
 #include "vna_measurement.hpp"
+#include "raw_vna_measurement.h"
 #include "fifo.hpp"
 #include "flash.hpp"
 #include "calibration.hpp"
@@ -57,6 +58,7 @@ using namespace board;
 void* __dso_handle = (void*) &__dso_handle;
 
 static bool outputRawSamples = false;
+static bool rawAutoSwitch = false;
 int cpu_mhz = 8; /* The CPU boots on internal (HSI) 8Mhz */
 
 
@@ -69,6 +71,7 @@ static const int adcBufSize=1024;	// must be power of 2
 static volatile uint16_t adcBuffer[adcBufSize];
 
 static VNAMeasurement vnaMeasurement;
+static RawVNAMeasurement rawVnaMeasurement;
 static CommandParser cmdParser;
 static StreamFIFO cmdInputFIFO;
 static uint8_t cmdInputBuffer[128];
@@ -85,11 +88,11 @@ static constexpr int usbTxQueueMask = 255;
 static volatile int usbTxQueueWPos = 0;
 static volatile int usbTxQueueRPos = 0;
 
+extern uint16_t ADCValueQueue[8192];  // from raw_vna_measurement.cpp
+constexpr int ADCValueQueueMask = 8191;
+extern volatile int ADCValueQueueWPos;
+extern volatile int ADCValueQueueRPos;
 
-static uint16_t ADCValueQueue[8192];
-static constexpr int ADCValueQueueMask = 8191;
-static volatile int ADCValueQueueWPos = 0;
-static volatile int ADCValueQueueRPos = 0;
 
 // periods of a 1MHz clock; how often to call adc_process()
 static constexpr int tim1Period = 25;	// 1MHz / 25 = 40kHz
@@ -413,6 +416,9 @@ For a description of the command interface see command_parser.hpp
 	- 0: reference
 	- 1: rx port 1
 	- 2: rx port 2
+-- 32: set BB gain
+-- 33: collectData samplesPerPhase[7..0]	
+-- 33:			   samplesPerPhase[15..8]					
 -- f0: device variant (01)
 -- f1: protocol version (01)
 -- f2: hardware revision
@@ -639,6 +645,12 @@ static void cmdRegisterWrite(int address) {
 		if(val >= 0 &&  val <= 3)
 			rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(val));
 	}
+	if(address == 0x33)
+	{
+		auto samplesPerPhase = *(uint16_t*)(registers + 0x33);
+		rawAutoSwitch = true;
+		rawVnaMeasurement.collectData(samplesPerPhase);
+	}
 }
 
 
@@ -701,6 +713,8 @@ static void measurementPhaseChanged(VNAMeasurementPhases ph) {
 		case VNAMeasurementPhases::ECALSHORT:
 			rfsw(RFSW_ECAL, RFSW_ECAL_SHORT);
 			break;
+		default:
+			break;
 	}
 }
 
@@ -727,6 +741,11 @@ static void measurementEmitDataPoint(int freqIndex, freqHz_t freqHz, VNAObservat
 		__sync_synchronize();
 		usbTxQueueWPos = (wrWPos + 1) & usbTxQueueMask;
 	}
+}
+
+static void rawMeasurementEmitData()
+{
+	rawAutoSwitch = false;
 }
 
 
@@ -760,32 +779,53 @@ static void measurement_setup() {
 	vnaMeasurement.gainMin = 0;
 	vnaMeasurement.gainMax = RFSW_BBGAIN_MAX;
 	vnaMeasurement.init();
+	
+	rawVnaMeasurement.phaseChanged = [](VNAMeasurementPhases ph) {
+		measurementPhaseChanged(ph);
+	};	
+	rawVnaMeasurement.emitData = [](){
+		rawMeasurementEmitData();
+	};
+	rawVnaMeasurement.init();
 }
+
 
 static void adc_process() {
 	volatile uint16_t* buf;
 	int len;
 	for(int i=0; i<2; i++) {
 		adc_read(buf, len);
-		for(int k=0;k<len;k++)
+		if(outputRawSamples)
 		{
-			int wrWPos = ADCValueQueueWPos;
-			int wrRPos = ADCValueQueueRPos;
-			__sync_synchronize();			
-			if(((wrWPos + 1) & ADCValueQueueMask) == wrRPos) 
+			if(rawAutoSwitch)
 			{
-				// overflow
-				// discard value
-				break;
-			} 			
+				rawVnaMeasurement.processSamples((uint16_t*)buf, len);
+			}
 			else
 			{
-				ADCValueQueue[ADCValueQueueWPos] = buf[k];
-				__sync_synchronize();				
-				ADCValueQueueWPos = (ADCValueQueueWPos + 1) & ADCValueQueueMask;				
+				
+				for(int k=0;k<len;k++)
+				{
+					int wrWPos = ADCValueQueueWPos;
+					int wrRPos = ADCValueQueueRPos;
+					__sync_synchronize();			
+					if(((wrWPos + 1) & ADCValueQueueMask) == wrRPos) 
+					{
+						// overflow
+						// discard value
+						break;
+					} 			
+					else
+					{
+						ADCValueQueue[ADCValueQueueWPos] = buf[k];
+						__sync_synchronize();				
+						ADCValueQueueWPos = (ADCValueQueueWPos + 1) & ADCValueQueueMask;				
+					}
+				}
 			}
+			
 		}
-		if(!outputRawSamples)
+		else
 			vnaMeasurement.processSamples((uint16_t*)buf, len);
 	}
 }
