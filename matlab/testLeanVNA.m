@@ -2,14 +2,14 @@
 
 function testLeanVNA
     clear global
-    global Fs loFreq S21 S11
+    global S21 S11
 
-    numValues = 512; % max 2048
+    numValues = 2048; % max 2048
     Fs=300000; % sample rate of ADC is 300 kHz
     nAverages = 1;
-    fStart = 1E9;
-    fEnd = 1.5E9;
-    nPoints = 20;
+    fStart = 100E6;
+    fEnd = 300E6;
+    nPoints = 40;
 
     if ~exist('transNorm','var')
         transNorm=ones(1,nPoints);
@@ -28,7 +28,6 @@ function testLeanVNA
     S21 = zeros(1,nPoints);
     S11 = zeros(1,nPoints);
     fIndex=1;
-    vna.setFrequency(fStart);
     vna.clearFifo();
     
     if fEnd < 140E6
@@ -46,8 +45,7 @@ function testLeanVNA
             loFreq = 6000;
         end
         sinTable = vna.generateSinTable(Fs,numValues,loFreq);
-        vna.adjustRxGain(f)
-        
+        vna.adjustRxGain(f)        
         tempS21 = zeros(1,nAverages);
         tempS11 = zeros(1,nAverages);
         for k = 1:nAverages
@@ -55,15 +53,14 @@ function testLeanVNA
             figure(fig1);
             
             vna.collectData(numValues);
-            pause(0.01) % weird glitches with all bytes being 0 happen without this wait
             adcData = vna.readADC(numValues*3);
             adcData2(1,:) = adcData(1:numValues);
             adcData2(2,:) = adcData(1*numValues+1:2*numValues);
             adcData2(3,:) = adcData(2*numValues+1:3*numValues);
 
             adcData2(1:3,:) = kaiser(length(adcData2),5)'.*adcData2(1:3,:);
-            %amplitude = vna.calculateIFAmplitude(adcData2(1:3,:),sinTable);
-            amplitude =vna.calculateIFAmplitudeFFT(adcData2(1:3,:),Fs,loFreq);
+            amplitude = vna.calculateIFAmplitude(adcData2(1:3,:),sinTable);
+            %amplitude =vna.calculateIFAmplitudeFFT(adcData2(1:3,:),Fs,loFreq);
             for i = 1:3
 
                 subplot(2,3,i)

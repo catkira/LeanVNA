@@ -1,6 +1,7 @@
 classdef LeanVNA  < handle
     properties
         s;
+        lastFrequency=0;
     end
     methods
         function openConnection(obj)
@@ -37,9 +38,15 @@ classdef LeanVNA  < handle
             flush(obj.s)
         end
         function setFrequency(obj,f)
+            % there is a bug in adf4350_set(), it needs to be executed 2 times
+            % after powerup (relevant for frequencies over 140 MHz)            
             frequency = uint64(f);
             disp("freq: " + int2str(f));
             write(obj.s,[0x23 0x0 typecast(frequency, 'uint8')],'uint8');
+            if(obj.lastFrequency <= 140E6 & f > 140E6)
+                write(obj.s,[0x23 0x0 typecast(frequency, 'uint8')],'uint8');
+            end
+            obj.lastFrequency=frequency;
         end    
         function a = calculateIFAmplitudeFFT(obj,adcValues,Fs,loFreq)
             n = length(adcValues);

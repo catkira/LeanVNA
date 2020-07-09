@@ -14,9 +14,6 @@ function rxTest
     vna.setGain(3);
     vna.selectPath(3);
     vna.setFrequency(1E9);
-    % there is a bug in adf4350_set(), it needs to be executed 2 times
-    % after powerup (relevant for frequencies over 140 MHz)
-    vna.setFrequency(1E9);
 
     j=1;
     x=0;
@@ -25,7 +22,6 @@ function rxTest
     adcData2 = zeros(3,numValues);
     while(1)
         vna.collectData(numValues);
-        pause(0.01) % weird glitches with all bytes being 0 happen without this wait
         adcData = vna.readADC(numValues*3);
         adcData2(1,:) = adcData(1:numValues);
         adcData2(2,:) = adcData(1*numValues+1:2*numValues);
