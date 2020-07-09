@@ -60,7 +60,7 @@ function testLeanVNA
             figure(fig1);
             
             collectData(numValues);
-            pause(0.01) % weird glitches with all bytes being 0 happen without this wait
+            %pause(0.01) % weird glitches with all bytes being 0 happen without this wait
             adcData = readADC(numValues*3);
             adcData2(1,:) = adcData(1:numValues);
             adcData2(2,:) = adcData(1*numValues+1:2*numValues);

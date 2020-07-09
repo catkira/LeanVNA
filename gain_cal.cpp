@@ -17,7 +17,8 @@ static void discardPoints(FIFO<complexf, fifoSize>& dpFIFO, int n) {
 
 	// skip n data points
 	for(int i=0; i<n; i++) {
-		while(!dpFIFO.readable());
+		while(!dpFIFO.readable())
+		{};
 		dpFIFO.dequeue();
 	}
 }
@@ -52,10 +53,10 @@ void performGainCal(VNAMeasurement& vnaMeasurement, float* gainTable, int maxGai
 		discardPoints(dpFIFO, 3);
 		float mag = 0;
 		for(int i=0; i<10; i++) {
-			while(!dpFIFO.readable());
-			auto& dp = dpFIFO.read();
+			while(!dpFIFO.readable())
+			{};
+			auto dp = dpFIFO.dequeue();
 			mag += abs(dp);
-			dpFIFO.dequeue();
 		}
 		gainTable[currGain] = 1.f/mag;
 	}

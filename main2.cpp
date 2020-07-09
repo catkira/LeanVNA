@@ -72,7 +72,7 @@ static const int adcBufSize=1024;	// must be power of 2
 static volatile uint16_t adcBuffer[adcBufSize];
 
 static VNAMeasurement vnaMeasurement;
-static FIFO<uint16_t,4096> ADCValueQueue;
+static FIFO<uint16_t,8192> ADCValueQueue;
 static RawVNAMeasurement<decltype(ADCValueQueue)> rawVnaMeasurement;
 static CommandParser cmdParser;
 static StreamFIFO cmdInputFIFO;
@@ -466,8 +466,7 @@ static void cmdReadFIFO(int address, int nValues)
 				if(!ADCValueQueue.readable())  // queue empty
 					continue;
 
-				uint16_t temp = ADCValueQueue.read();
-				ADCValueQueue.dequeue();
+				uint16_t temp = ADCValueQueue.dequeue();
 				txbuf[2*i+0]=uint8_t(temp  >>0);
 				txbuf[2*i+1]=uint8_t(temp  >>8);
 				i++;		
