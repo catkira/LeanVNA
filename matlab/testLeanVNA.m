@@ -62,7 +62,8 @@ function testLeanVNA
             adcData2(3,:) = adcData(2*numValues+1:3*numValues);
 
             adcData2(1:3,:) = kaiser(length(adcData2),5)'.*adcData2(1:3,:);
-            amplitude = vna.calculateIFAmplitude(adcData2(1:3,:),sinTable);
+            %amplitude = vna.calculateIFAmplitude(adcData2(1:3,:),sinTable);
+            amplitude =vna.calculateIFAmplitudeFFT(adcData2(1:3,:),Fs,loFreq);
             for i = 1:3
 
                 subplot(2,3,i)
@@ -77,7 +78,7 @@ function testLeanVNA
                 ylim([-32700 32700])
 
                 subplot(2,3,i+3)
-                %bar(abs(amplitude(i)));
+                bar(abs(amplitude(i)));
                 ylim([0 32000]);   
 
             end
@@ -99,16 +100,4 @@ function testLeanVNA
     end    
 end
 
-function a = calculateIFAmplitudeFFT(adcValues)
-    global Fs loFreq
-    n = length(adcValues);
-    Y=fft(adcValues)/n;
-    P2=Y;
-    P1 = P2(1:n/2+1);
-    P1(2:end-1) = 2*P1(2:end-1);            
-
-    % take amplitude at intermediate frequency loFreq
-    ifIndex = round(loFreq/(Fs/n))+1;
-    a = P1(ifIndex) + P1(ifIndex+1); % use 2 fft bins 
-end
   

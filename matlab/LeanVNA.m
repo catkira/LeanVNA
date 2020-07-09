@@ -41,18 +41,23 @@ classdef LeanVNA  < handle
             disp("freq: " + int2str(f));
             write(obj.s,[0x23 0x0 typecast(frequency, 'uint8')],'uint8');
         end    
-%         function a = calculateIFAmplitudeFFT(obj,adcValues)
-%             global Fs loFreq
-%             n = length(adcValues);
-%             Y=fft(adcValues)/n;
-%             P2=Y;
-%             P1 = P2(1:n/2+1);
-%             P1(2:end-1) = 2*P1(2:end-1);            
-% 
-%             % take amplitude at intermediate frequency loFreq
-%             ifIndex = round(loFreq/(Fs/n))+1;
-%             a = P1(ifIndex) + P1(ifIndex+1); % use 2 fft bins 
-%         end
+        function a = calculateIFAmplitudeFFT(obj,adcValues,Fs,loFreq)
+            n = length(adcValues);
+            Y=zeros(3,n);
+            Y(1,:)=fft(adcValues(1,:))/n;
+            Y(2,:)=fft(adcValues(2,:))/n;
+            Y(3,:)=fft(adcValues(3,:))/n;
+            P2=Y;
+            P1 = P2(:,1:n/2+1);
+            P1(:,2:end-1) = 2*P1(:,2:end-1);
+
+            % take amplitude at intermediate frequency loFreq
+            ifIndex = round(loFreq/(Fs/n))+2; % +2 improves result
+            a = P1(:,ifIndex); 
+            % dont know why the complex conjugate has to be taken for the
+            % result
+            a = conj(a);
+        end
 
         function a = calculateIFAmplitude(obj,adcValues,sinTable)
             n = length(adcValues);
