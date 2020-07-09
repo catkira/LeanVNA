@@ -36,7 +36,7 @@
 #include "globals.hpp"
 #include "synthesizers.hpp"
 #include "vna_measurement.hpp"
-#include "raw_vna_measurement.h"
+#include "raw_vna_measurement.hpp"
 #include "fifo.hpp"
 #include "flash.hpp"
 #include "calibration.hpp"
@@ -72,7 +72,8 @@ static const int adcBufSize=1024;	// must be power of 2
 static volatile uint16_t adcBuffer[adcBufSize];
 
 static VNAMeasurement vnaMeasurement;
-static RawVNAMeasurement rawVnaMeasurement;
+static FIFO<uint16_t,4096> ADCValueQueue;
+static RawVNAMeasurement<decltype(ADCValueQueue)> rawVnaMeasurement;
 static CommandParser cmdParser;
 static StreamFIFO cmdInputFIFO;
 static uint8_t cmdInputBuffer[128];
@@ -89,10 +90,6 @@ static constexpr int usbTxQueueMask = 255;
 static volatile int usbTxQueueWPos = 0;
 static volatile int usbTxQueueRPos = 0;
 
-extern uint16_t ADCValueQueue[8192];  // from raw_vna_measurement.cpp
-constexpr int ADCValueQueueMask = 8191;
-extern volatile int ADCValueQueueWPos;
-extern volatile int ADCValueQueueRPos;
 
 
 // periods of a 1MHz clock; how often to call adc_process()
@@ -282,13 +279,13 @@ static void adc_setup() {
 }
 
 // read and consume data from the adc ring buffer
-static void adc_read(volatile uint16_t*& data, int& len) {
+static void adc_read(uint16_t*& data, int& len) {
 	static uint32_t lastIndex = 0;
 	uint32_t cIndex = dmaADC.position();
 	uint32_t bufWords = dmaADC.bufferSizeBytes / 2;
 	cIndex &= (bufWords-1);
 
-	data = ((volatile uint16_t*) dmaADC.buffer) + lastIndex;
+	data = ((uint16_t*) dmaADC.buffer) + lastIndex;
 	if(cIndex >= lastIndex) {
 		len = cIndex - lastIndex;
 	} else {
@@ -466,17 +463,13 @@ static void cmdReadFIFO(int address, int nValues)
 			int i=0;
 			while(i<(txBufSize/2) && i<valuesLeft) 
 			{
-				int rdRPos = ADCValueQueueRPos;
-				int rdWPos = ADCValueQueueWPos;
-				__sync_synchronize();
-
-				if(rdRPos == rdWPos)  // queue empty
+				if(!ADCValueQueue.readable())  // queue empty
 					continue;
 
-				txbuf[2*i+0]=uint8_t(ADCValueQueue[rdRPos]  >>0);
-				txbuf[2*i+1]=uint8_t(ADCValueQueue[rdRPos]  >>8);
-
-				ADCValueQueueRPos = (rdRPos + 1) & ADCValueQueueMask;
+				uint16_t temp = ADCValueQueue.read();
+				ADCValueQueue.dequeue();
+				txbuf[2*i+0]=uint8_t(temp  >>0);
+				txbuf[2*i+1]=uint8_t(temp  >>8);
 				i++;		
 			}
 			if(!serialSendTimeout((char*)txbuf, 2*i, 1500)) // max number of bytes seems to be 0x3f
@@ -609,7 +602,7 @@ static void cmdRegisterWrite(int address) {
 		vnaMeasurement.nPeriods = MEASUREMENT_NPERIODS_CALIBRATING;
 	}
 	if(address == 0x30) {
-		ADCValueQueueRPos = ADCValueQueueWPos; // clear ADCValueQueue
+		ADCValueQueue.clear();
 		usbTxQueueRPos = usbTxQueueWPos; // clear usbTxQueue
 	}
 	if(address == 0x31) 
@@ -775,12 +768,13 @@ static void measurement_setup() {
 	rawVnaMeasurement.emitData = [](){
 		rawMeasurementEmitData();
 	};
+	rawVnaMeasurement.ADCValueQueue = &ADCValueQueue;
 	rawVnaMeasurement.init();
 }
 
 
 static void adc_process() {
-	volatile uint16_t* buf;
+	uint16_t* buf;
 	int len;
 	for(int i=0; i<2; i++) {
 		adc_read(buf, len);
@@ -795,10 +789,7 @@ static void adc_process() {
 				
 				for(int k=0;k<len;k++)
 				{
-					int wrWPos = ADCValueQueueWPos;
-					int wrRPos = ADCValueQueueRPos;
-					__sync_synchronize();			
-					if(((wrWPos + 1) & ADCValueQueueMask) == wrRPos) 
+					if(!ADCValueQueue.writable()) 
 					{
 						// overflow, discard remaining values
 						// if this happens, phase information gets lost and S11/S21 phase cannot be calculated!
@@ -807,9 +798,7 @@ static void adc_process() {
 					} 			
 					else
 					{
-						ADCValueQueue[ADCValueQueueWPos] = buf[k];
-						__sync_synchronize();				
-						ADCValueQueueWPos = (ADCValueQueueWPos + 1) & ADCValueQueueMask;				
+						ADCValueQueue.enqueue(buf[k]);
 					}
 				}
 			}

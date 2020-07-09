@@ -43,6 +43,7 @@ function testLeanVNA
     
     for f = fStart:(fEnd-fStart)/(nPoints-1):fEnd
         setFrequency(f)
+        setFrequency(f)
         pause(0.05)
         if f >= 100000
             loFreq = 12000;

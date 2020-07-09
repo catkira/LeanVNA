@@ -5,7 +5,7 @@ function rxTest
     global Fs s sinTable adcData adcData2
 
     Fs=300000; % sample rate of ADC is 300 kHz
-    numValues = 2048;
+    numValues = 1024;
 
     if ~isempty(instrfind) 
         fclose(instrfind); 
@@ -25,6 +25,7 @@ function rxTest
     setGain(3);
     selectPath(3);
     setFrequency(1E9);
+    setFrequency(1E9); %TODO: why need to send this 2 times?
 
     j=1;
     x=0;
@@ -63,9 +64,6 @@ function rxTest
         hold off
         axis([xmin xmax -100 10]);
         drawnow;
-        figure(2)
-        plot(adcData2(3,:));
-        ylim([-32700 32700])        
         j=j+1;
     end
 end
@@ -136,7 +134,7 @@ end
 
 function selectPath(i)
     global s
-    write(s,[0x20 0x31 i-1],"uint8");
+    write(s,[0x20 0x31 uint8(i-1)],"uint8");
 end
 
 function setGain(i)

@@ -1,3 +1,4 @@
+#pragma once
 #include <stdint.h>
 
 // size must be a power of 2.
