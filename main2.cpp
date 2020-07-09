@@ -57,8 +57,9 @@ using namespace board;
 // this can be any value since we are not using shared libraries.
 void* __dso_handle = (void*) &__dso_handle;
 
-static bool outputRawSamples = false;
-static bool rawAutoSwitch = false;
+static volatile bool outputRawSamples = false;
+static volatile bool rawAutoSwitch = false;
+static volatile bool usbDataMode = false;
 int cpu_mhz = 8; /* The CPU boots on internal (HSI) 8Mhz */
 
 
@@ -100,20 +101,8 @@ static constexpr int tim1Period = 25;	// 1MHz / 25 = 40kHz
 // value is in microseconds; increments at 40kHz by TIM1 interrupt
 volatile uint32_t systemTimeCounter = 0;
 
-static FIFO<small_function<void()>, 8> eventQueue;
-
-static volatile bool usbDataMode = false;
-
 static freqHz_t currFreqHz = 0;		// current hardware tx frequency
 static int currThruGain = 0;		// gain setting used for this thru measurement
-
-// if nonzero, any ecal data in the next ecalIgnoreValues data points will be ignored.
-// this variable is decremented every time a data point arrives, if nonzero.
-static volatile int ecalIgnoreValues = 0;
-static volatile int collectMeasurementType = -1;
-static int collectMeasurementOffset = -1;
-static int collectMeasurementState = 0;
-static small_function<void()> collectMeasurementCB;
 
 static void adc_process();
 static int measurementGetDefaultGain(freqHz_t freqHz);
@@ -811,8 +800,9 @@ static void adc_process() {
 					__sync_synchronize();			
 					if(((wrWPos + 1) & ADCValueQueueMask) == wrRPos) 
 					{
-						// overflow
-						// discard value
+						// overflow, discard remaining values
+						// if this happens, phase information gets lost and S11/S21 phase cannot be calculated!
+						// therefore better use rawAutoSwitch=true mode, if phase is needed
 						break;
 					} 			
 					else
