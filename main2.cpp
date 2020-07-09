@@ -255,7 +255,8 @@ static void setFrequency(freqHz_t freqHz) {
 		rfsw(RFSW_TXSYNTH, RFSW_TXSYNTH_HF);
 		rfsw(RFSW_RXSYNTH, RFSW_RXSYNTH_HF);
 		vnaMeasurement.nWaitSynth = 10;
-	} else {
+	} 
+	else {
 		int ret = si5351_update(freqHz);
 		rfsw(RFSW_TXSYNTH, RFSW_TXSYNTH_LF);
 		rfsw(RFSW_RXSYNTH, RFSW_RXSYNTH_LF);
@@ -404,7 +405,7 @@ For a description of the command interface see command_parser.hpp
 	- 2: rx port 2
 -- 32: set BB gain
 -- 33: collectData samplesPerPhase[7..0]	
--- 33:			   samplesPerPhase[15..8]					
+-- 34:			   samplesPerPhase[15..8]					
 -- f0: device variant (01)
 -- f1: protocol version (01)
 -- f2: hardware revision
@@ -632,6 +633,14 @@ static void cmdRegisterWrite(int address) {
 		rawAutoSwitch = true;
 		rawVnaMeasurement.collectData(samplesPerPhase);
 	}
+	if(address == 0x35)
+	{
+		auto val = *(uint16_t*)(registers + 0x35);
+		if(val)
+			adf4350_powerup();
+		else
+			adf4350_powerdown();
+	}	
 }
 
 
@@ -797,7 +806,7 @@ static void adc_process() {
 					} 			
 					else
 					{
-						ADCValueQueue.enqueue(buf[k]);
+						//ADCValueQueue.enqueue(buf[k]);
 					}
 				}
 			}

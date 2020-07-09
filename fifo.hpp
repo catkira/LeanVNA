@@ -37,8 +37,7 @@ public:
 	}
 
 	void clear() {
-		while(readable()) 
-			dequeue();
+		_rpos = _wpos = 0;
 	}
 
 	bool enqueue(const T& value) {
