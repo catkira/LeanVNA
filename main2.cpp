@@ -940,9 +940,6 @@ int main(void) {
 	while(true) {
 		// process any outstanding commands from usb
 		cmdInputFIFO.drain();
-		
-		//if(outputRawSamples)
-//			usb_transmit_rawSamples();
 	}
 }
 
