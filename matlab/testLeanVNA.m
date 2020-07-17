@@ -26,7 +26,6 @@ function testLeanVNA
     switchDescription = ["reference" "reflection" "through"];
     
     S21 = zeros(1,nPoints);
-    S11 = zeros(1,nPoints);
     fIndex=1;
     vna.clearFifo();
     
