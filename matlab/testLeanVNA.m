@@ -18,7 +18,7 @@ function testLeanVNA
     vna = LeanVNA;
     vna.openConnection();   
     vna.enterRawMode();
-    vna.setGain(1);
+    vna.setGain(2);
         
     fig1=figure(1);
     fig2=figure(2);
@@ -34,6 +34,9 @@ function testLeanVNA
     else
         vna.adf4350Power(1);        
     end
+    
+    vna.Si5351RxPower(1);
+    vna.Si5351TxPower(1);
 
     
     for f = fStart:(fEnd-fStart)/(nPoints-1):fEnd
@@ -58,7 +61,8 @@ function testLeanVNA
             adcData2(2,:) = adcData(1*numValues+1:2*numValues);
             adcData2(3,:) = adcData(2*numValues+1:3*numValues);
 
-            adcData2(1:3,:) = kaiser(length(adcData2),5)'.*adcData2(1:3,:);
+            % windows is not necessary if sample rate is in sync with IF
+            %adcData2(1:3,:) = kaiser(length(adcData2),5)'.*adcData2(1:3,:);
             amplitude = vna.calculateIFAmplitude(adcData2(1:3,:),sinTable);
             %amplitude =vna.calculateIFAmplitudeFFT(adcData2(1:3,:),Fs,loFreq);
             for i = 1:3
