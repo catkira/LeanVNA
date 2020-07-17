@@ -12,7 +12,10 @@ namespace synthesizers {
 	// returns 1 if two output dividers changed;
 	// returns 2 if pll updated.
 	int si5351_set(uint32_t rxFreqHz, uint32_t txFreqHz);
+	
+	void si5351_tx_powerCmd(bool powerOn);
 
+	void si5351_rx_powerCmd(bool powerOn);
 
 	// freqHz must be a multiple of freqStepHz
 	template<class T>

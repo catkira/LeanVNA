@@ -20,6 +20,11 @@ classdef LeanVNA  < handle
         end
         function enterRawMode(obj)
             write([obj.s],[0x20 0x26 0x01],"uint8");
+            % execute clear fifo and give time to process this command
+            % without clearing the fifo, old data might be in the buffer
+            % which offsets all the new data
+            obj.clearFifo();
+            pause(0.1);
         end
         function collectData(obj,i)
             write(obj.s,[0x21 0x33 typecast(uint16(i), 'uint8')],"uint8")  % samplesPerPhase
@@ -27,6 +32,12 @@ classdef LeanVNA  < handle
         function adf4350Power(obj,i)
             write(obj.s,[0x20 0x35 uint8(i-1)],"uint8");
         end
+        function Si5351TxPower(obj,i)
+            write(obj.s,[0x20 0x36 uint8(i)],"uint8");
+        end        
+        function Si5351RxPower(obj,i)
+            write(obj.s,[0x20 0x37 uint8(i)],"uint8");
+        end        
         function selectPath(obj,i)
             write(obj.s,[0x20 0x31 uint8(i-1)],"uint8");
         end

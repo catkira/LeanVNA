@@ -11,9 +11,9 @@ function rxTest
     vna.openConnection();   
     vna.enterRawMode();
     
-    vna.setGain(3);
+    vna.setGain(1);
     vna.selectPath(3);
-    vna.setFrequency(1E9);
+    vna.setFrequency(151.4E7);
 
     j=1;
     x=0;

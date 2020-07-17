@@ -56,7 +56,7 @@ public:
 	void setMeasurementPhase(VNAMeasurementPhases ph);	
 	void collectData(uint32_t samplesPerPhase);
 private:
-	bool startRequest = false;
+	volatile bool startRequest = false;
 	uint16_t sampleBuffer[2048];	
 };
 

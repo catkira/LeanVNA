@@ -365,7 +365,7 @@ static complexf applyFixedCorrectionsThru(complexf thru, freqHz_t freq) {
 
 
 bool serialSendTimeout(const char* s, int len, int timeoutMillis) {
-	for(int i = 0; i < timeoutMillis; i++) {
+	for(volatile int i = 0; i < timeoutMillis; i++) {
 		if(serial.trySend(s, len))
 			return true;
 		delay(1);
@@ -461,12 +461,12 @@ static void cmdReadFIFO(int address, int nValues)
 		volatile uint32_t valuesLeft = nValues*64;
 		while(valuesLeft > 0)
 		{
-			int i=0;
+			volatile int i=0;
 			while(i<(txBufSize/2) && i<valuesLeft) 
 			{
 				if(!ADCValueQueue.readable())  // queue empty
 					continue;
-
+				__sync_synchronize();
 				volatile uint16_t temp = ADCValueQueue.dequeue();
 				txbuf[2*i+0]=uint8_t(temp  >>0);
 				txbuf[2*i+1]=uint8_t(temp  >>8);
@@ -641,6 +641,18 @@ static void cmdRegisterWrite(int address) {
 		else
 			adf4350_powerdown();
 	}	
+	if(address == 0x36)
+	{
+		auto val = *(uint16_t*)(registers + 0x36);
+		synthesizers::si5351_tx_powerCmd((bool)val);
+	}		
+	if(address == 0x37)
+	{
+		auto val = *(uint16_t*)(registers + 0x37);
+		synthesizers::si5351_rx_powerCmd((bool)val);
+	}		
+	
+	
 }
 
 

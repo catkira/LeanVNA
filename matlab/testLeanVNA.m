@@ -6,10 +6,10 @@ function testLeanVNA
 
     numValues = 2048; % max 2048
     Fs=300000; % sample rate of ADC is 300 kHz
-    nAverages = 1;
-    fStart = 100E6;
-    fEnd = 300E6;
-    nPoints = 40;
+    nAverages = 2;
+    fStart = 50E6;
+    fEnd = 80E6;
+    nPoints = 100;
 
     if ~exist('transNorm','var')
         transNorm=ones(1,nPoints);
@@ -35,6 +35,7 @@ function testLeanVNA
     else
         vna.adf4350Power(1);        
     end
+
     
     for f = fStart:(fEnd-fStart)/(nPoints-1):fEnd
         vna.setFrequency(f)
@@ -89,7 +90,7 @@ function testLeanVNA
 
             figure(fig3);
             plot(fStart:(fEnd-fStart)/(nPoints-1):fEnd,20*log10(abs(S21)));
-            ylim([-100 10]);
+            ylim([-110 10]);
             ylabel('S21 (dB)')
             xlabel('f (Hz)')
         end

@@ -31,7 +31,7 @@ public:
 	T dequeue() {
 		if(!readable())
 			abort();
-		auto ret = elements[_rpos];
+		T ret = elements[_rpos];
 		_rpos = (_rpos+1) & sizeMask;
 		return ret;
 	}
