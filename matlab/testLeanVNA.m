@@ -4,7 +4,7 @@ function testLeanVNA
     clear global
     global S21 S11
 
-    numValues = 2048; % max 2048
+    numValues = 128; % max 2048
     Fs=300000; % sample rate of ADC is 300 kHz
     nAverages = 2;
     fStart = 50E6;
@@ -62,7 +62,7 @@ function testLeanVNA
             adcData2(3,:) = adcData(2*numValues+1:3*numValues);
 
             % windows is not necessary if sample rate is in sync with IF
-            %adcData2(1:3,:) = kaiser(length(adcData2),5)'.*adcData2(1:3,:);
+            adcData2(1:3,:) = kaiser(length(adcData2),5)'.*adcData2(1:3,:);
             amplitude = vna.calculateIFAmplitude(adcData2(1:3,:),sinTable);
             %amplitude =vna.calculateIFAmplitudeFFT(adcData2(1:3,:),Fs,loFreq);
             for i = 1:3
