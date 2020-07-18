@@ -5,7 +5,7 @@ function rxTest
     global Fs adcData adcData2
 
     Fs=300000; % sample rate of ADC is 300 kHz
-    numValues = 1024;
+    numValues = 2048;
 
     vna = LeanVNA;
     vna.openConnection();   

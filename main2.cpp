@@ -459,20 +459,20 @@ static void cmdReadRawFifo(const uint16_t nValues)
 	while(valuesLeft > 0)
 	{
 		volatile int i=0;
-		while(i<(txBufSize/2) && i<valuesLeft) 
+		while(i<(txBufSize-1) && valuesLeft) 
 		{
 			if(!ADCValueQueue.readable())  // queue empty
 				continue;
 			if(!rawVnaMeasurement.started()) // prevent reading old data before the new collection process has started
 				continue;
+			__sync_synchronize();
 			volatile uint16_t temp = ADCValueQueue.dequeue();
-			txbuf[2*i+0]=uint8_t(temp  >>0);
-			txbuf[2*i+1]=uint8_t(temp  >>8);
-			i++;		
+			txbuf[i++]=uint8_t(temp>>0);
+			txbuf[i++]=uint8_t(temp>>8);
+			valuesLeft--;
 		}
-		if(!serialSendTimeout((char*)txbuf, 2*i, 1500)) // max number of bytes seems to be 0x3f
+		if(!serialSendTimeout((char*)txbuf, i, 1500)) // max number of bytes seems to be 0x3f
 			return;
-		valuesLeft -= i;
 	}
 	return;	
 }
