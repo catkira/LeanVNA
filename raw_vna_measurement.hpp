@@ -101,6 +101,7 @@ void RawVNAMeasurement<FIFO>::sampleProcessor_emitValue(uint16_t* buf, uint32_t 
 		startRequest = false;
 		ADCValueQueue->clear();
 		setMeasurementPhase(VNAMeasurementPhases::REFERENCE);
+		return;
 	}
 	if(measurementPhase == VNAMeasurementPhases::IDLE)
 		return;

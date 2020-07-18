@@ -4,7 +4,7 @@ function testLeanVNA
     clear global
     global S21 S11
 
-    numValues = 128; % max 2048
+    numValues = 2048; % max 2048
     Fs=300000; % sample rate of ADC is 300 kHz
     nAverages = 2;
     fStart = 50E6;

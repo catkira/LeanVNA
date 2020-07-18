@@ -92,7 +92,7 @@ classdef LeanVNA  < handle
         end
 
         function data = readADC(obj,n)
-            write(obj.s,[0x18 0x31 uint8(n/64)],"uint8"); % read 255 values from adc, each values 2 bytes
+            write(obj.s,[0x21 0x27 typecast(uint16(n), 'uint8')],"uint8"); % read 255 values from adc, each values 2 bytes
             adcVals = zeros(1,n*2);
             %disp("waiting...")
             adcVals = read(obj.s,n*2,"uint8");

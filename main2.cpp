@@ -451,34 +451,32 @@ For a description of the command interface see command_parser.hpp
 -- 1a - 1f: reserved
 */
 
+static void cmdReadRawFifo(const uint16_t nValues)
+{
+	const int txBufSize=0x3f;
+	volatile uint8_t txbuf[txBufSize];
+	volatile uint32_t valuesLeft = nValues;
+	while(valuesLeft > 0)
+	{
+		volatile int i=0;
+		while(i<(txBufSize/2) && i<valuesLeft) 
+		{
+			if(!ADCValueQueue.readable())  // queue empty
+				continue;
+			volatile uint16_t temp = ADCValueQueue.dequeue();
+			txbuf[2*i+0]=uint8_t(temp  >>0);
+			txbuf[2*i+1]=uint8_t(temp  >>8);
+			i++;		
+		}
+		if(!serialSendTimeout((char*)txbuf, 2*i, 1500)) // max number of bytes seems to be 0x3f
+			return;
+		valuesLeft -= i;
+	}
+	return;	
+}
 
 static void cmdReadFIFO(int address, int nValues) 
 {
-	if(address == 0x31)
-	{
-		const int txBufSize=0x3f;
-		volatile uint8_t txbuf[txBufSize];
-		volatile uint32_t valuesLeft = nValues*64;
-		while(valuesLeft > 0)
-		{
-			volatile int i=0;
-			while(i<(txBufSize/2) && i<valuesLeft) 
-			{
-				if(!ADCValueQueue.readable())  // queue empty
-					continue;
-				__sync_synchronize();
-				volatile uint16_t temp = ADCValueQueue.dequeue();
-				txbuf[2*i+0]=uint8_t(temp  >>0);
-				txbuf[2*i+1]=uint8_t(temp  >>8);
-				i++;		
-			}
-			if(!serialSendTimeout((char*)txbuf, 2*i, 1500)) // max number of bytes seems to be 0x3f
-				return;
-			valuesLeft -= i;
-		}
-		return;
-	}
-
 	if(address != 0x30) 
 		return;	
 	
@@ -586,7 +584,8 @@ static void cmdRegisterWrite(int address) {
 		//freqHz_t f = (freqHz_t)*(uint64_t*)(registers + 0x00);
 		setFrequency((freqHz_t)*(uint64_t*)(registers + 0x00));
 	}
-	if(address == 0x26) {
+	if(address == 0x26) 
+	{
 		auto val = registers[0x26];
 		if(val == 0) {
 			outputRawSamples = false;
@@ -595,6 +594,12 @@ static void cmdRegisterWrite(int address) {
 		} else if(val == 2) {
 			outputRawSamples = false;
 		}
+	}
+	if(address == 0x27) 
+	{
+		auto numBytes = *(uint16_t*)(registers + 0x27);
+		cmdReadRawFifo(numBytes);
+		
 	}
 	if(address == 0x00 || address == 0x10 || address == 0x20) {
 		ecalState = ECAL_STATE_MEASURING;
