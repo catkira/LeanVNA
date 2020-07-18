@@ -6,7 +6,7 @@ function testLeanVNA
 
     numValues = 2048; % max 2048
     Fs=300000; % sample rate of ADC is 300 kHz
-    nAverages = 2;
+    nAverages = 1;
     fStart = 50E6;
     fEnd = 80E6;
     nPoints = 100;

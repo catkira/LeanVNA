@@ -55,6 +55,7 @@ public:
 	
 	void setMeasurementPhase(VNAMeasurementPhases ph);	
 	void collectData(uint32_t samplesPerPhase);
+	bool started();
 private:
 	volatile bool startRequest = false;
 	uint16_t sampleBuffer[2048];	
@@ -91,6 +92,12 @@ template <typename FIFO>
 void RawVNAMeasurement<FIFO>::processSamples(uint16_t* buf, uint32_t len) 
 {
 	sampleProcessor.process(buf, len);
+}
+
+template <typename FIFO>
+bool RawVNAMeasurement<FIFO>::started()
+{
+	return !startRequest;
 }
 
 template <typename FIFO>

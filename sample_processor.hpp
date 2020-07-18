@@ -5,14 +5,12 @@ template<class emitValue_t>
 class RawSampleProcessor {
 private:
 	uint16_t* sampleBuffer;
+	uint32_t accumPhase;	
 
 public:
-	uint32_t accumPhase;
-
 	// integration time for each output value
 	int accumPeriod = 50;
 
-	// void emitValue(int32_t valRe, int32_t valIm)
 	emitValue_t emitValue;
 
 	RawSampleProcessor(const emitValue_t& cb, uint16_t* sampleBuffer): emitValue(cb), sampleBuffer(sampleBuffer) {}
@@ -20,11 +18,6 @@ public:
 		accumPhase = 0;
 	}
 	
-	
-
-	// len specifies the number of aggregates (i.e. when nStreams > 1,
-	// the number of words in the array must be len * nStreams).
-	// returns whether we completed a cycle.
 	bool process(uint16_t* samples, int len) {
 		uint16_t* end = samples+len;
 		while(samples < end) {

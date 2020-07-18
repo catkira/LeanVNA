@@ -14,7 +14,7 @@ classdef LeanVNA  < handle
             write(obj.s,0x0d,"uint8")
             data=read(obj.s,1,"uint8");
             if data ~= '2'
-                disp 'Error'
+                disp 'Error: did not receive correct answer after 0x0d'
                 return
             end            
         end
@@ -24,6 +24,7 @@ classdef LeanVNA  < handle
             % without clearing the fifo, old data might be in the buffer
             % which offsets all the new data
             obj.clearFifo();
+            flush(obj.s);
             pause(0.1);
         end
         function collectData(obj,i)
@@ -96,6 +97,9 @@ classdef LeanVNA  < handle
             adcVals = zeros(1,n*2);
             %disp("waiting...")
             adcVals = read(obj.s,n*2,"uint8");
+            if length(adcVals) ~= n*2
+                disp("Error: did not receive enough data");
+            end
             %disp("data received.")
 
             data = zeros(1,n);

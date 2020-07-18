@@ -463,6 +463,8 @@ static void cmdReadRawFifo(const uint16_t nValues)
 		{
 			if(!ADCValueQueue.readable())  // queue empty
 				continue;
+			if(!rawVnaMeasurement.started()) // prevent reading old data before the new collection process has started
+				continue;
 			volatile uint16_t temp = ADCValueQueue.dequeue();
 			txbuf[2*i+0]=uint8_t(temp  >>0);
 			txbuf[2*i+1]=uint8_t(temp  >>8);

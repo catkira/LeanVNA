@@ -23,9 +23,7 @@ public:
 	}
 	
 	bool readable() const {
-		if((_wpos & sizeMask) == _rpos)
-			return false;
-		return true;
+		return !(_wpos == _rpos);
 	}
 
 	T dequeue() {
