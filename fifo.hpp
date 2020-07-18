@@ -42,7 +42,7 @@ public:
 
 	bool enqueue(const T& value) {
 		if(!writable())
-			return false;
+			abort();
 		elements[_wpos]=value;
 		_wpos = (_wpos+1) & sizeMask;		
 		return true;
