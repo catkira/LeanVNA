@@ -13,8 +13,11 @@ function rxTest
     vna.enterRawMode();
     
     vna.selectPath(3);
-    vna.setFrequency(50E6);
+    vna.Si5351TxPower(1);
+    vna.Si5351RxPower(1);
+    vna.setFrequency(140E6);
     vna.setGain(3);
+    pause()
 
     figure(1)
     clf
@@ -52,7 +55,7 @@ function rxTest
         plot(x1,20*log10(data1(2,:)));
         plot(x1,20*log10(data1(3,:)));
         hold off
-        axis([xmin xmax -100 10]);
+        axis([xmin xmax -110 10]);
         drawnow;
         j=j+1;
     end
