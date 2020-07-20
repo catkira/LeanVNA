@@ -63,7 +63,7 @@ static volatile bool usbDataMode = false;
 int cpu_mhz = 8; /* The CPU boots on internal (HSI) 8Mhz */
 
 
-static int lo_freq = 12000; // IF frequency, Hz
+static int lo_freq = 150000; // IF frequency, Hz
 static int adf4350_freqStep = 12000; // adf4350 resolution, Hz
 
 static USBSerial serial;
@@ -218,25 +218,22 @@ static void adf4350_powerup(void) {
 static void updateIFrequency(freqHz_t txFreqHz) {
 	// adf4350 freq step and thus IF frequency must be a divisor of the crystal frequency
 	if(xtalFreqHz == 20000000 || xtalFreqHz == 40000000) {
-		// 6.25/12.5kHz IF
-		if(txFreqHz >= 100000) {
-			lo_freq = 12500;
-			adf4350_freqStep = 12500;
-			vnaMeasurement.setCorrelationTable(sinROM24x2, 48);
-		} else {
-			lo_freq = 6250;
-			adf4350_freqStep = 6250;
-			vnaMeasurement.setCorrelationTable(sinROM48x1, 48);
-		}
+		// not supported in this firmware
+		abort();
 	} else {
 		// 6.0/12.0kHz IF
-		if(txFreqHz >= 100000) {
-			lo_freq = 12000;
-			adf4350_freqStep = 12000;
+		if(txFreqHz >= 100000) 
+		{
+			lo_freq = 150000;
+			adf4350_freqStep = 10000;
+			// TODO: fix update sinROM table for new LO
 			vnaMeasurement.setCorrelationTable(sinROM25x2, 50);
-		} else {
+		} 
+		else 
+		{
 			lo_freq = 6000;
 			adf4350_freqStep = 6000;
+			// TODO: fix update sinROM table for new LO
 			vnaMeasurement.setCorrelationTable(sinROM50x1, 50);
 		}
 	}

@@ -5,8 +5,8 @@ function testLeanVNA
     global S21 S11
 
     numValues = 2048; % max 2048
-    Fs=300000; % sample rate of ADC is 300 kHz
-    nAverages = 1;
+    Fs=1200000; % sample rate of ADC is 300 kHz
+    nAverages = 10;
     fStart = 50E6;
     fEnd = 80E6;
     nPoints = 100;
@@ -18,7 +18,7 @@ function testLeanVNA
     vna = LeanVNA;
     vna.openConnection();   
     vna.enterRawMode();
-    vna.setGain(2);
+    vna.setGain(3);
         
     fig1=figure(1);
     fig2=figure(2);
@@ -43,12 +43,12 @@ function testLeanVNA
         vna.setFrequency(f)
         pause(0.05)
         if f >= 100000
-            loFreq = 12000;
+            loFreq = 150000;
         else
             loFreq = 6000;
         end
         sinTable = vna.generateSinTable(Fs,numValues,loFreq);
-        vna.adjustRxGain(f)        
+       % vna.adjustRxGain(f)        
         tempS21 = zeros(1,nAverages);
         tempS11 = zeros(1,nAverages);
         for k = 1:nAverages

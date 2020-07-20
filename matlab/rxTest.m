@@ -5,6 +5,7 @@ function rxTest
     global Fs adcData adcData2
 
     Fs=1200000; % sample rate of ADC is 300 kHz
+    loFreq = 150000;
     numValues = 2048;
 
     vna = LeanVNA;
@@ -12,12 +13,11 @@ function rxTest
     vna.enterRawMode();
     
     vna.selectPath(3);
-    vna.setFrequency(151.4E4);
-    vna.setGain(0);
+    vna.setFrequency(50E6);
+    vna.setGain(3);
 
     j=1;  
     x=0;
-    loFreq = 12000;
     sinTable = vna.generateSinTable(Fs,numValues,loFreq); 
     adcData2 = zeros(3,numValues);
     while(1)
