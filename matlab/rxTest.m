@@ -16,6 +16,9 @@ function rxTest
     vna.setFrequency(50E6);
     vna.setGain(3);
 
+    figure(1)
+    clf
+    
     j=1;  
     x=0;
     sinTable = vna.generateSinTable(Fs,numValues,loFreq); 

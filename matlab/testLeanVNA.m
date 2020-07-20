@@ -21,8 +21,11 @@ function testLeanVNA
     vna.setGain(3);
         
     fig1=figure(1);
+    clf
     fig2=figure(2);
+    clf
     fig3=figure(3);
+    clf
     switchDescription = ["reference" "reflection" "through"];
     
     S21 = zeros(1,nPoints);

@@ -232,8 +232,7 @@ static void updateIFrequency(freqHz_t txFreqHz) {
 		{
 			lo_freq = 6000;
 			adf4350_freqStep = 6000;
-			// TODO: fix update sinROM table for new LO
-			vnaMeasurement.setCorrelationTable(sinROM50x1, 50);
+			vnaMeasurement.setCorrelationTable(sinROM200x1, 200);
 		}
 	}
 }
@@ -681,12 +680,15 @@ static void cmdInit() {
 }
 
 static int measurementGetDefaultGain(freqHz_t freqHz) {
+	return 3; // always use highest gain with 150 kHz IF
+	/*
 	if(freqHz > 2500000000)
 		return 2;
 	else if(freqHz > FREQUENCY_CHANGE_OVER)
 		return 1;
 	else
 		return 0;
+	*/
 }
 // callback called by VNAMeasurement to change rf switch positions.
 static void measurementPhaseChanged(VNAMeasurementPhases ph) {
