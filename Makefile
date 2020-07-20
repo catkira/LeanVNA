@@ -3,7 +3,7 @@ MCULIB         ?= /media/sf__shared_git/mculib
 OPENCM3_DIR    ?= /media/sf__shared_git/libopencm3-gd32f3
 
 # device config
-BOARDNAME		= board_v2_2
+BOARDNAME		= board_v2_3
 DEVICE          = gd32f303cc_nofpu
 
 

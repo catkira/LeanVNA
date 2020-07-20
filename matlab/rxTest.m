@@ -4,18 +4,18 @@ function rxTest
     clear global
     global Fs adcData adcData2
 
-    Fs=300000; % sample rate of ADC is 300 kHz
+    Fs=1200000; % sample rate of ADC is 300 kHz
     numValues = 2048;
 
     vna = LeanVNA;
     vna.openConnection();   
     vna.enterRawMode();
     
-    vna.setGain(1);
     vna.selectPath(3);
-    vna.setFrequency(151.4E7);
+    vna.setFrequency(151.4E4);
+    vna.setGain(0);
 
-    j=1;
+    j=1;  
     x=0;
     loFreq = 12000;
     sinTable = vna.generateSinTable(Fs,numValues,loFreq); 
