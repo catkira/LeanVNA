@@ -29,6 +29,7 @@ public:
 	T dequeue() {
 		if(!readable())
 			abort();
+		__sync_synchronize();		
 		T ret = elements[_rpos];
 		_rpos = (_rpos+1) & sizeMask;
 		return ret;
@@ -41,6 +42,7 @@ public:
 	bool enqueue(const T& value) {
 		if(!writable())
 			abort();
+		__sync_synchronize();
 		elements[_wpos]=value;
 		_wpos = (_wpos+1) & sizeMask;		
 		return true;
