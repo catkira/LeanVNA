@@ -7,8 +7,8 @@ function testLeanVNA
     numValues = 2048; % max 2048
     Fs=1200000; % sample rate of ADC is 300 kHz
     nAverages = 10;
-    fStart = 50E6;
-    fEnd = 80E6;
+    fStart = 50E7;
+    fEnd = 80E7;
     nPoints = 100;
 
     if ~exist('transNorm','var')

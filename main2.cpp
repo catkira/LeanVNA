@@ -226,8 +226,7 @@ static void updateIFrequency(freqHz_t txFreqHz) {
 		{
 			lo_freq = 150000;
 			adf4350_freqStep = 10000;
-			// TODO: fix update sinROM table for new LO
-			vnaMeasurement.setCorrelationTable(sinROM25x2, 50);
+			vnaMeasurement.setCorrelationTable(sinROM8x8, 64);
 		} 
 		else 
 		{
