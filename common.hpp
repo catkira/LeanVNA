@@ -62,50 +62,11 @@ static constexpr uint32_t FREQUENCY_CHANGE_OVER	= 140000000;
 #endif
 
 
-#define CAL_LOAD 0
-#define CAL_OPEN 1
-#define CAL_SHORT 2
-#define CAL_THRU 3
-#define CAL_ISOLN_OPEN 4
-#define CAL_ISOLN_SHORT 5
-
-#define CALSTAT_LOAD (1<<0)
-#define CALSTAT_OPEN (1<<1)
-#define CALSTAT_SHORT (1<<2)
-#define CALSTAT_THRU (1<<3)
-#define CALSTAT_ISOLN (1<<4)
-#define CALSTAT_ES (1<<5)
-#define CALSTAT_ER (1<<6)
-#define CALSTAT_ET (1<<7)
-#define CALSTAT_ED CALSTAT_LOAD
-#define CALSTAT_EX CALSTAT_ISOLN
-#define CALSTAT_APPLY (1<<8)
-#define CALSTAT_INTERPOLATED (1<<9)
-
 #define ETERM_ED 0 /* error term directivity */
 #define ETERM_ES 1 /* error term source match */
 #define ETERM_ER 2 /* error term refrection tracking */
 #define ETERM_ET 3 /* error term transmission tracking */
 #define ETERM_EX 4 /* error term isolation */
-
-#define DOMAIN_MODE (1<<0)
-#define DOMAIN_FREQ (0<<0)
-#define DOMAIN_TIME (1<<0)
-#define TD_FUNC (0b11<<1)
-#define TD_FUNC_BANDPASS (0b00<<1)
-#define TD_FUNC_LOWPASS_IMPULSE (0b01<<1)
-#define TD_FUNC_LOWPASS_STEP    (0b10<<1)
-#define TD_WINDOW (0b11<<3)
-#define TD_WINDOW_NORMAL (0b00<<3)
-#define TD_WINDOW_MINIMUM (0b01<<3)
-#define TD_WINDOW_MAXIMUM (0b10<<3)
-
-
-#define REDRAW_CELLS      (1<<0)
-#define REDRAW_FREQUENCY  (1<<1)
-#define REDRAW_CAL_STATUS (1<<2)
-#define REDRAW_MARKER     (1<<3)
-#define REDRAW_AREA       (1<<4)
 
 
 constexpr uint32_t BOOTLOADER_DFU_MAGIC = 0xdeadbabe;
