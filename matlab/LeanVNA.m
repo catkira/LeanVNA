@@ -9,7 +9,7 @@ classdef LeanVNA  < handle
                 fclose(instrfind); 
                 delete(instrfind);
             end    
-            obj.s=serialport('COM7',1000000);
+            obj.s=serialport('COM5',1000000);
             write(obj.s,0,"uint8")
             write(obj.s,0x0d,"uint8")
             data=read(obj.s,1,"uint8");

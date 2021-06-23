@@ -291,18 +291,6 @@ static void adc_read(uint16_t*& data, int& len) {
 	if(lastIndex >= bufWords) lastIndex = 0;
 }
 
-
-static void lcd_and_ui_setup() {
-	lcd_spi_init();
-
-	pinMode(ili9341_cs, OUTPUT);
-	pinMode(xpt2046_cs, OUTPUT);
-	digitalWrite(ili9341_cs, HIGH);	// disable LCD
-	digitalWrite(xpt2046_cs, HIGH); // disable touch screen
-	
-	lcd_spi_fast();
-}
-
 static complexf ecalApplyReflection(complexf refl, int freqIndex) {
 	#ifdef ECAL_PARTIAL
 		return refl - measuredEcal[0][freqIndex];
@@ -910,7 +898,6 @@ int main(void) {
 	nvic_set_priority(NVIC_USB_HP_CAN_TX_IRQ, 0xf0);
 
 	// set up lcd and hook up UI events
-	lcd_and_ui_setup();
 
 	delay(50);
 	
