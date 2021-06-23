@@ -13,10 +13,10 @@ config_t config = {
   .checksum =          0
 };
 
+properties_t current_props;
 
 complexf measuredFreqDomain[2][SWEEP_POINTS_MAX] alignas(8);
 complexf measured[2][SWEEP_POINTS_MAX] alignas(8);
-complexf measuredEcal[ECAL_CHANNELS][USB_POINTS_MAX] alignas(8);
 
 volatile EcalStates ecalState = ECAL_STATE_MEASURING;
 

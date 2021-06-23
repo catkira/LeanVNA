@@ -63,7 +63,7 @@ static volatile bool usbDataMode = false;
 int cpu_mhz = 8; /* The CPU boots on internal (HSI) 8Mhz */
 
 
-static int lo_freq = 150000; // IF frequency, Hz
+static int lo_freq = 12000; // IF frequency, Hz
 static int adf4350_freqStep = 12000; // adf4350 resolution, Hz
 
 static USBSerial serial;
@@ -81,6 +81,7 @@ static uint8_t cmdInputBuffer[128];
 
 static float gainTable[RFSW_BBGAIN_MAX+1];
 
+__attribute__((packed))
 struct usbDataPoint {
 	VNAObservation value;
 	int freqIndex;
@@ -168,9 +169,6 @@ extern "C" void tim1_up_isr() {
 
 
 static int si5351_doUpdate(uint32_t freqHz) {
-	// si5351 code seems to give high frequency errors when frequency
-	// isn't a multiple of 10Hz. TODO: investigate
-	freqHz = (freqHz/10) * 10;
 	return synthesizers::si5351_set(freqHz+lo_freq, freqHz);
 }
 
@@ -216,24 +214,29 @@ static void adf4350_powerup(void) {
 
 // automatically set IF frequency depending on rf frequency and board parameters
 static void updateIFrequency(freqHz_t txFreqHz) {
-	// adf4350 freq step and thus IF frequency must be a divisor of the crystal frequency
-	if(xtalFreqHz == 20000000 || xtalFreqHz == 40000000) {
-		// not supported in this firmware
-		abort();
-	} 
-	else {
-		// 6.0/12.0kHz IF
-		if(txFreqHz >= 100000) { // use 150 kHz IF for txFreq over 100 kHz
-			lo_freq = 150000;
-			adf4350_freqStep = 10000;
-			vnaMeasurement.setCorrelationTable(sinROM8x8, 64);
-		} 
-		else {
-			lo_freq = 6000;
-			adf4350_freqStep = 6000;
-			vnaMeasurement.setCorrelationTable(sinROM200x1, 200);
-		}
+	nvic_disable_irq(NVIC_TIM1_UP_IRQ);
+	if(txFreqHz < 40000) { //|| (txFreqHz > 149000000 && txFreqHz < 151000000)) {
+		lo_freq = 6000;
+		adf4350_freqStep = 6000;
+		vnaMeasurement.setCorrelationTable(sinROM200x1, 200);
+		vnaMeasurement.adcFullScale = 10000 * 200 * 200;
+		vnaMeasurement.gainMax = 0;
+		vnaMeasurement.currThruGain = 0;
+	} else if(txFreqHz <= 350000) { //|| (txFreqHz > 149000000 && txFreqHz < 151000000)) {
+		lo_freq = 12000;
+		adf4350_freqStep = 12000;
+		vnaMeasurement.setCorrelationTable(sinROM100x1, 100);
+		vnaMeasurement.adcFullScale = 10000 * 100 * 100;
+		vnaMeasurement.gainMax = 0;
+		vnaMeasurement.currThruGain = 0;
+	} else {
+		lo_freq = 150000;
+		adf4350_freqStep = 10000;
+		vnaMeasurement.setCorrelationTable(sinROM8x8, 64);
+		vnaMeasurement.adcFullScale = 10000 * 48 * 20;
+		vnaMeasurement.gainMax = 3;
 	}
+	nvic_enable_irq(NVIC_TIM1_UP_IRQ);
 }
 
 // set the measurement frequency including setting the tx and rx synthesizers
@@ -291,6 +294,11 @@ static void adc_read(uint16_t*& data, int& len) {
 	if(lastIndex >= bufWords) lastIndex = 0;
 }
 
+#ifdef BOARD_DISABLE_ECAL
+// Made measure ecal, and apply correction
+#define ecalApplyReflection(refl, freqIndex) refl
+#else
+complexf measuredEcal[ECAL_CHANNELS][USB_POINTS_MAX] alignas(8);
 static complexf ecalApplyReflection(complexf refl, int freqIndex) {
 	#ifdef ECAL_PARTIAL
 		return refl - measuredEcal[0][freqIndex];
@@ -302,7 +310,7 @@ static complexf ecalApplyReflection(complexf refl, int freqIndex) {
 					refl);
 	#endif
 }
-
+#endif
 
 static complexf applyFixedCorrections(complexf refl, freqHz_t freq) {
 	// These corrections do not affect calibrated measurements
@@ -557,11 +565,24 @@ static void setVNASweepToUSB() {
 	vnaMeasurement.sweepDataPointsPerFreq = values;
 	vnaMeasurement.sweepPoints = points;
 	vnaMeasurement.resetSweep();
+	if(outputRawSamples) {
+		setFrequency((freqHz_t)*(uint64_t*)(registers + 0x00));
+	}	
 }
 
 static void measurementPhaseChanged(VNAMeasurementPhases ph);
 
 static void cmdRegisterWrite(int address) {
+	if (address == 0x40) 
+	{
+		current_props._avg = (uint8_t) registers[0x40];
+		return;
+	}
+	if (address == 0x42) 
+	{
+		current_props._adf4350_txPower = (uint8_t)registers[0x42]; 
+		return;
+	}
 	if(address == 0x00 || address == 0x10 || address == 0x20 || address == 0x22) 
 		setVNASweepToUSB();
 	if(address == 0x00)
@@ -854,13 +875,26 @@ int main(void) {
 
 	boardInit();
 
+	uint32_t* deviceID = (uint32_t*)0x1FFFF7E8;
+
 	// set version registers (accessed through usb serial)
 	registers[0xf0 & registersSizeMask] = 2;	// device variant
 	registers[0xf1 & registersSizeMask] = 1;	// protocol version
 	registers[0xf2 & registersSizeMask] = (uint8_t) BOARD_REVISION;
 	registers[0xf3 & registersSizeMask] = (uint8_t) FIRMWARE_MAJOR_VERSION;
 	registers[0xf4 & registersSizeMask] = (uint8_t) FIRMWARE_MINOR_VERSION;
-
+	for(int i=0; i<3; i++) {
+		registers[(0xd0 + i*4 + 0) & registersSizeMask] = deviceID[i] & 0xff;
+		registers[(0xd0 + i*4 + 1) & registersSizeMask] = (deviceID[i] >> 8) & 0xff;
+		registers[(0xd0 + i*4 + 2) & registersSizeMask] = (deviceID[i] >> 16) & 0xff;
+		registers[(0xd0 + i*4 + 3) & registersSizeMask] = (deviceID[i] >> 24) & 0xff;
+	}
+	//	-- 40: average setting
+	//	-- 41: si5351 power (reserved)
+	//	-- 42: adf4350 power
+	registers[0x40] = current_props._avg;
+	registers[0x41] = current_props._si5351_txPower;
+	registers[0x42] = current_props._adf4350_txPower;
 	// we want all higher priority irqs to preempt lower priority ones
 	scb_set_priority_grouping(SCB_AIRCR_PRIGROUP_GROUP16_NOSUB);
 
@@ -921,6 +955,7 @@ int main(void) {
 
 
 	setFrequency(56000000);
+	updateIFrequency(300000);
 
 	
 	// initialize VNAMeasurement

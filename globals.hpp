@@ -21,7 +21,7 @@ extern volatile bool sweep_enabled;
 extern int16_t vbat;
 
 extern int16_t lastsaveid;
-
+extern properties_t current_props;
 
 extern config_t config;
 
@@ -30,8 +30,6 @@ extern complexf measuredFreqDomain[2][SWEEP_POINTS_MAX];
 
 // measured data, possibly transformed
 extern complexf measured[2][SWEEP_POINTS_MAX];
-
-extern complexf measuredEcal[ECAL_CHANNELS][USB_POINTS_MAX];
 
 
 enum EcalStates {

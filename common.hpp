@@ -33,7 +33,7 @@ typedef int64_t freqHz_t;
 
 #define VERSION "git"
 #define FIRMWARE_MAJOR_VERSION 1
-#define FIRMWARE_MINOR_VERSION 1
+#define FIRMWARE_MINOR_VERSION 2
 #define CH_KERNEL_VERSION "None"
 #define PORT_COMPILER_NAME "gcc"
 #define PORT_ARCHITECTURE_NAME "arm"
@@ -76,19 +76,27 @@ constexpr int MEASUREMENT_NPERIODS_NORMAL = 14;
 constexpr int MEASUREMENT_NPERIODS_CALIBRATING = 30;
 constexpr int MEASUREMENT_ECAL_INTERVAL = 5;
 
-enum class VNAMeasurementPhases {
-	REFERENCE,
-	REFL,
-	THRU,
 
-	ECALLOAD,
-	ECALSHORT,
-	ECALTHRU,
-	
-	IDLE
+struct alignas(4) properties_t {
+  uint32_t magic;
+  freqHz_t _frequency0; // start
+  freqHz_t _frequency1; // stop
+  int16_t _sweep_points;
+  uint16_t _cal_status;
+
+  float _electrical_delay; // picoseconds
+
+  float _velocity_factor; // %
+  int _active_marker;
+  uint8_t _domain_mode; /* 0bxxxxxffm : where ff: TD_FUNC m: DOMAIN_MODE */
+  uint8_t _marker_smith_format;
+  uint8_t _avg;
+  uint8_t _adf4350_txPower; // 0 to 3
+  uint8_t _si5351_txPower; // 0 to 3
+  uint8_t _measurement_mode; //See enum MeasurementMode.
+
+  uint32_t checksum;
 };
-
-
 
 typedef struct {
   uint32_t magic;
@@ -98,13 +106,20 @@ typedef struct {
 
 
 
-#define CONFIG_MAGIC 0x80081235
+#define CONFIG_MAGIC 0x8008123c
 
 
 static inline bool is_freq_for_adf4350(freqHz_t freq) 
 {
 	return freq > FREQUENCY_CHANGE_OVER;
 }
+
+/* Determines the measurements the ADC will do. */
+enum MeasurementMode {
+    MEASURE_MODE_FULL, //Including ECAL, slowest
+    MEASURE_MODE_REFL_THRU, //Does not switch the output, use for CW mode
+    MEASURE_MODE_REFL_THRU_REFRENCE, //No ecal
+};
 
 // convert vbat [mV] to battery indicator
 static inline uint8_t vbat2bati(int16_t vbat)

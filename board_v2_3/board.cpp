@@ -21,7 +21,6 @@
 using namespace mculib;
 using namespace std;
 
-
 namespace board {
 
 	// set by board_init()
