@@ -152,10 +152,9 @@ namespace board {
 		 /* Enable external high-speed oscillator. */
 		 rcc_osc_on(RCC_HSE);
 		 rcc_wait_for_osc_ready(RCC_HSE);
-		 rcc_set_sysclk_source(RCC_CFGR_SW_SYSCLKSEL_HSECLK);
 
-		 /* Select HSI as SYSCLK source. */
-		 rcc_set_sysclk_source(RCC_CFGR_SW_SYSCLKSEL_HSICLK);
+		 /* Select HSE as SYSCLK source. */
+		 rcc_set_sysclk_source(RCC_CFGR_SW_SYSCLKSEL_HSECLK);
 		 
 		 rcc_osc_off(RCC_PLL);
 		 /*

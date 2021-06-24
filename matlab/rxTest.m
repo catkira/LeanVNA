@@ -4,7 +4,7 @@ function rxTest
     clear global
     global Fs adcData adcData2
 
-    Fs=1200000; % sample rate of ADC is 300 kHz
+    Fs=1500000;
     loFreq = 150000;
     %numValues = 2048;
     numValues = 1024;
@@ -14,8 +14,8 @@ function rxTest
     vna.enterRawMode();
     
     vna.selectPath(3);
-    vna.Si5351TxPower(1);
-    vna.Si5351RxPower(1);
+    %vna.Si5351TxPower(1);
+    %vna.Si5351RxPower(1);
     vna.setFrequency(140E6);
     vna.setGain(3);
     pause()

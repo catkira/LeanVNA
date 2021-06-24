@@ -154,6 +154,3 @@ static inline bool is_freq_for_adf4350(freqHz_t freq)
 	return freq > FREQUENCY_CHANGE_OVER;
 }
 
-float my_atof(const char *p);
-
-

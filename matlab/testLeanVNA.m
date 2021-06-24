@@ -5,10 +5,10 @@ function testLeanVNA
     global S21 S11
 
     numValues = 2048; % max 2048
-    Fs=1200000; % sample rate of ADC is 300 kHz
+    Fs=1500000; 
     nAverages = 1;
-    fStart = 200E6;
-    fEnd = 300E6;
+    fStart = 100E6;
+    fEnd = 150E6;
     nPoints = 30;
 
     if ~exist('transNorm','var')
@@ -38,8 +38,8 @@ function testLeanVNA
         vna.adf4350Power(1);        
     end
     
-    vna.Si5351RxPower(1);
-    vna.Si5351TxPower(1);
+    %vna.Si5351RxPower(1);
+    %vna.Si5351TxPower(1);
 
     
     for f = fStart:(fEnd-fStart)/(nPoints-1):fEnd

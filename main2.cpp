@@ -85,7 +85,6 @@ static volatile uint16_t adcBuffer[adcBufSize];
 
 static VNAMeasurement vnaMeasurement;
 static FIFO<uint16_t,8192> ADCValueQueue;
-//static FIFO<uint16_t,4096> ADCValueQueue;
 static RawVNAMeasurement<decltype(ADCValueQueue)> rawVnaMeasurement;
 static CommandParser cmdParser;
 static StreamFIFO cmdInputFIFO;
@@ -608,6 +607,8 @@ static void cmdReadFIFO(int address, int nValues)
 		}
 
 		usbDataPoint& usbDP = usbTxQueue[rdRPos];
+		if(usbDP.freqIndex < 0 || usbDP.freqIndex > USB_POINTS_MAX)
+			continue;		
 
 		complexf refl = ecalApplyReflection(usbDP.S11, usbDP.freqIndex);
 		complexf thru = usbDP.S21;
@@ -672,6 +673,31 @@ static void cmdReadFIFO(int address, int nValues)
 		usbTxQueueRPos = (rdRPos + 1) & usbTxQueueMask;
 		i++;
 	}
+}
+
+// apply user-entered (on device) sweep parameters
+static void setVNASweepToUI() {
+	freqHz_t start = 100;
+	freqHz_t stop = 1000000;
+	freqHz_t step = 0;
+	if(current_props._sweep_points > 0)
+		step = (stop - start) / (current_props._sweep_points - 1);
+
+	// Default to full, after ecalState is done we goto the configured mode
+#if BOARD_REVISION < 4
+	ecalState = ECAL_STATE_MEASURING;
+	vnaMeasurement.measurement_mode = MEASURE_MODE_FULL;
+	vnaMeasurement.ecalIntervalPoints = 1;
+	vnaMeasurement.nPeriods = MEASUREMENT_NPERIODS_CALIBRATING;
+	vnaMeasurement.setSweep(start, step, current_props._sweep_points, current_props._avg);
+	ecalState = ECAL_STATE_MEASURING;
+#else
+	currTimingsArgs.nAverage = 1;
+	sys_syscall(5, &currTimingsArgs);
+	setHWSweep(sys_setSweep_args {
+		start, step, current_props._sweep_points, current_props._avg
+	});
+#endif
 }
 
 // apply usb-configured sweep parameters
@@ -791,11 +817,11 @@ static void cmdRegisterWrite(int address) {
 	if(address == 0x36)
 	{
 		auto val = *(uint16_t*)(registers + 0x36);
-		synthesizers::si5351_tx_powerCmd((bool)val);
+		synthesizers::si5351_tx_powerCmd((bool)val);  // TODO: does not seem to work
 	}		
 	if(address == 0x37)
 	{
-		auto val = *(uint16_t*)(registers + 0x37);
+		auto val = *(uint16_t*)(registers + 0x37);    // TODO: does not seem to work
 		synthesizers::si5351_rx_powerCmd((bool)val);
 	}		
 	
@@ -1082,6 +1108,15 @@ static void measurement_setup() {
 	vnaMeasurement.gainMin = 0;
 	vnaMeasurement.gainMax = RFSW_BBGAIN_MAX;
 	vnaMeasurement.init();
+
+	rawVnaMeasurement.phaseChanged = [](VNAMeasurementPhases ph) {
+		measurementPhaseChanged(ph);
+	};	
+	rawVnaMeasurement.emitData = [](){
+		rawMeasurementEmitData();
+	};
+	rawVnaMeasurement.ADCValueQueue = &ADCValueQueue;
+	rawVnaMeasurement.init();	
 }
 
 
@@ -1134,8 +1169,26 @@ bool cpu_enable_fpu(void)
 	return true;
 }
 
-int main(void) {
+// nanovna UI callbacks
+namespace UIActions {
+	void rebuild_bbgain(void){
+#if BOARD_REVISION < 4
+		performGainCal(vnaMeasurement, gainTable, RFSW_BBGAIN_MAX);
+#else
+		sys_syscall(4, gainTable);
+#endif
 
+		for(int i=0; i<=RFSW_BBGAIN_MAX; i++) {
+			printk("BBGAIN %d: %.2f dB\n", i, log10f(gainTable[i])*20.f);
+		}
+	}
+
+	void cal_reset(void) {
+		current_props.setCalDataToDefault();
+	}	
+}
+
+int main(void) {
 	boardInit();
 
 	uint32_t* deviceID = (uint32_t*)0x1FFFF7E8;
@@ -1198,11 +1251,19 @@ int main(void) {
 
 	delay(50);
 	
+	UIActions::cal_reset();
 	flash_config_recall();
+	// Load 0 slot
+	UIActions::cal_reset();
+	flash_caldata_recall(0);	
 
 	printk("xtal freq %d.%03d MHz\n", (xtalFreqHz/1000000), ((xtalFreqHz/1000) % 1000));
 
-	si5351_i2c.init();
+	bool si5351failed = false;
+	
+#if BOARD_REVISION < 4
+	if(!synthesizers::si5351_setup())
+		si5351failed = true;
 	if(!synthesizers::si5351_setup()) {
 		printk1("ERROR: si5351 init failed\n");
 		printk1("Touch anywhere to continue...\n");
@@ -1218,8 +1279,30 @@ int main(void) {
 	measurement_setup();
 	adc_setup();
 	dsp_timer_setup();
-
 	adf4350_setup();
+#else
+	adc_setup();
+	sys_init_args a1 = {
+		adcBuffer,
+		&DMA_CNDTR(board::dma.device, board::dmaChannelADC.channel),
+		adcBufSize,
+		&measurementEmitDataPoint
+	};
+	void* ret = sys_syscall(1, &a1);
+	if(ret == errnoToPtr(EHOSTDOWN))
+		si5351failed = true;
+
+	sys_syscall(2, nullptr);
+#endif
+
+	if(si5351failed) {
+		printk1("ERROR: si5351 init failed\n");
+		printk1("Touch anywhere to continue...\n");
+		current_props._frequency0 = 200000000;
+		//show_dmesg();
+	}
+	UIActions::rebuild_bbgain();
+	usbTxQueueRPos = usbTxQueueWPos;
 
 	performGainCal(vnaMeasurement, gainTable, RFSW_BBGAIN_MAX);
 
