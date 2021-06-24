@@ -245,9 +245,9 @@ namespace board {
 		pinMode(xpt2046_cs, OUTPUT);
 
 		adc_ratecfg = ADC_SMPR_SMP_7DOT5CYC;
-		adc_srate = 24000000/(7.5+12.5); // 1.2 MSPS
+		adc_srate = 30000000/(7.5+12.5); // 1.5 MSPS
 		adc_period_cycles = (7.5+12.5);
-		adc_clk = 24000000;
+		adc_clk = 30000000;
 	}
 
 
@@ -272,6 +272,20 @@ namespace board {
 		digitalWrite(led2, HIGH);
 		delayMicroseconds(1);
 		digitalWrite(led2, LOW);
+	}
+
+	int calculateSynthWaitAF(freqHz_t freqHz) {
+		if(freqHz < 3100000000) return 10;
+		return 24;
+	}
+
+	int calculateSynthWaitSI(int retval) {
+		switch(retval) {
+			case 0: return 36;
+			case 1: return 120;
+			case 2: return 32;
+		}
+		return 5;
 	}
 
 }

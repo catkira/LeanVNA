@@ -105,7 +105,7 @@ int flash_config_recall(void) {
 	void *dst = &config;
 
 	if (src->magic != CONFIG_MAGIC) {
-		printk("config_recall: incorrect magic %x, should be %x\n", src->magic, CONFIG_MAGIC);
+		//printk("config_recall: incorrect magic %x, should be %x\n", src->magic, CONFIG_MAGIC);
 		return -1;
 	}
 	int ck;

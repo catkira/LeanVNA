@@ -106,7 +106,7 @@ typedef struct {
 
 
 
-#define CONFIG_MAGIC 0x8008123c
+#define CONFIG_MAGIC 0x80081235
 
 
 static inline bool is_freq_for_adf4350(freqHz_t freq) 

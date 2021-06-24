@@ -239,6 +239,12 @@ static void updateIFrequency(freqHz_t txFreqHz) {
 	nvic_enable_irq(NVIC_TIM1_UP_IRQ);
 }
 
+// needed for correct automatic synthwait setting between board versions
+__attribute__((used, noinline)) int calculateSynthWait(bool isSi, int retval) {
+	if(isSi) return calculateSynthWaitSI(retval);
+	else return calculateSynthWaitAF(retval);
+}
+
 // set the measurement frequency including setting the tx and rx synthesizers
 static void setFrequency(freqHz_t freqHz) {
 	currFreqHz = freqHz;
@@ -251,18 +257,21 @@ static void setFrequency(freqHz_t freqHz) {
 		adf4350_update(freqHz);
 		rfsw(RFSW_TXSYNTH, RFSW_TXSYNTH_HF);
 		rfsw(RFSW_RXSYNTH, RFSW_RXSYNTH_HF);
-		vnaMeasurement.nWaitSynth = 10;
+		#ifdef EXPERIMENTAL_SYNTHWAIT
+			vnaMeasurement.nWaitSynth = calculateSynthWaitAF(freqHz);
+		#else
+			vnaMeasurement.nWaitSynth = calculateSynthWait(false, freqHz);
+		#endif
 	} 
 	else {
 		int ret = si5351_update(freqHz);
 		rfsw(RFSW_TXSYNTH, RFSW_TXSYNTH_LF);
 		rfsw(RFSW_RXSYNTH, RFSW_RXSYNTH_LF);
-		if(ret == 0)
-			vnaMeasurement.nWaitSynth = 18;
-		if(ret == 1)
-			vnaMeasurement.nWaitSynth = 60;
-		if(ret == 2)
-			vnaMeasurement.nWaitSynth = 60;
+		#ifdef EXPERIMENTAL_SYNTHWAIT
+			vnaMeasurement.nWaitSynth = calculateSynthWaitSI(ret);
+		#else
+			vnaMeasurement.nWaitSynth = calculateSynthWait(true, ret);
+		#endif
 	}
 }
 
@@ -888,7 +897,7 @@ int main(void) {
 		registers[(0xd0 + i*4 + 1) & registersSizeMask] = (deviceID[i] >> 8) & 0xff;
 		registers[(0xd0 + i*4 + 2) & registersSizeMask] = (deviceID[i] >> 16) & 0xff;
 		registers[(0xd0 + i*4 + 3) & registersSizeMask] = (deviceID[i] >> 24) & 0xff;
-	}
+	}	
 	//	-- 40: average setting
 	//	-- 41: si5351 power (reserved)
 	//	-- 42: adf4350 power
