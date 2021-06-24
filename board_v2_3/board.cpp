@@ -156,6 +156,7 @@ namespace board {
 
 		 /* Select HSI as SYSCLK source. */
 		 rcc_set_sysclk_source(RCC_CFGR_SW_SYSCLKSEL_HSICLK);
+		 
 		 rcc_osc_off(RCC_PLL);
 		 /*
 		  * Set prescalers for AHB, ADC, ABP1, ABP2.

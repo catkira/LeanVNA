@@ -84,11 +84,12 @@ static float gainTable[RFSW_BBGAIN_MAX+1];
 
 __attribute__((packed))
 struct usbDataPoint {
-	VNAObservation value;
+	//VNAObservation value;
+	complexf S11, S21;
 	int freqIndex;
 };
-static usbDataPoint usbTxQueue[256];
-static constexpr int usbTxQueueMask = 255;
+static usbDataPoint usbTxQueue[128];
+static constexpr int usbTxQueueMask = 127;
 static volatile int usbTxQueueWPos = 0;
 static volatile int usbTxQueueRPos = 0;
 
@@ -101,7 +102,14 @@ static constexpr int tim1Period = 25;	// 1MHz / 25 = 40kHz
 volatile uint32_t systemTimeCounter = 0;
 
 static freqHz_t currFreqHz = 0;		// current hardware tx frequency
-static int currThruGain = 0;		// gain setting used for this thru measurement
+
+// if nonzero, any ecal data in the next ecalIgnoreValues data points will be ignored.
+// this variable is decremented every time a data point arrives, if nonzero.
+static volatile int ecalIgnoreValues = 0;
+static volatile int collectMeasurementType = -1;
+static int collectMeasurementOffset = -1;
+static int collectMeasurementState = 0;
+static small_function<void()> collectMeasurementCB;
 
 static void adc_process();
 static int measurementGetDefaultGain(freqHz_t freqHz);
@@ -126,6 +134,85 @@ static void errorBlink(int cnt) {
 		}
 		delay(1000);
 	}
+}
+
+#define errnoToPtr(x) ((void*)(uint32_t)(-x))
+
+typedef void (*emitDataPoint_t)(int freqIndex, freqHz_t freqHz, VNAObservation v, const complexf* ecal, bool clipped);
+
+
+// the parameters for one point in the sweep
+struct sys_sweepPoint {
+	// populated with startFreq + i * stepFreq
+	int64_t freqHz = 0;
+
+	// populated with 0
+	uint32_t flags = 0;
+
+	// populated with 1; actual averaging factor is this multiplied by global nAverage
+	uint32_t nAverage = 1;
+
+	// populated with global dataPointsPerFreq
+	uint32_t dataPoints = 1;
+
+	// populated with 0; actual synth delay is baseDelay + extraSynthDelay + global extraSynthDelay
+	int16_t extraSynthDelay = 0;
+
+	// populated with 3
+	uint8_t adf4350_txPower = 3;
+
+	// populated with 1
+	uint8_t si5351_txPower = 1;
+
+	enum {
+		FLAG_POWERDOWN = 1,
+		FLAG_FORCE_ADF435X = 2,
+		FLAG_FORCE_SI5351 = 4,
+		FLAG_SKIP_SYNTH_SET = 8
+	};
+};
+
+struct sys_init_args {
+	volatile uint16_t* adcBuf;
+	volatile uint32_t* dmaCndtr;
+	uint32_t adcBufWords = 0;
+	emitDataPoint_t emitDataPoint;
+};
+struct sys_start_args {
+};
+struct sys_setSweep_args {
+	freqHz_t startFreqHz, stepFreqHz;
+	int nPoints, dataPointsPerFreq = 1;
+	uint32_t flags = 0;
+
+	// this function is called to modify the frequency or other parameters at
+	// each sweep point if FLAG_CUSTOMSWEEP is set.
+	// outParams is filled with default parameters and freqHz populated with
+	// startFreqHz + freqIndex * stepFreqHz when this function is called.
+	void (*sweepMutateParams)(int freqIndex, sys_sweepPoint* outParams);
+	enum {
+		FLAG_RFDISABLE=1,
+		FLAG_CUSTOMSWEEP=2
+	};
+};
+struct sys_setTimings_args {
+	uint32_t extraSynthDelay = 0;
+	uint32_t nAverage = 1;
+};
+
+typedef void* (*sys_syscall_t)(int opcode, void* args);
+sys_syscall_t sys_syscall = (sys_syscall_t) 0x08000151;
+
+sys_setSweep_args currSweepArgs;
+sys_setTimings_args currTimingsArgs;
+
+void sweepMutateParams(int freqIndex, sys_sweepPoint* outParams);
+
+void setHWSweep(const sys_setSweep_args& sweepArgs) {
+	currSweepArgs = sweepArgs;
+	currSweepArgs.flags = sys_setSweep_args::FLAG_CUSTOMSWEEP;
+	currSweepArgs.sweepMutateParams = &sweepMutateParams;
+	sys_syscall(3, &currSweepArgs);
 }
 
 // period is in units of us
@@ -185,8 +272,10 @@ static int si5351_update(uint32_t freqHz) {
 
 
 static void adf4350_setup() {
+	adf4350_rx.cpCurrent = 6;
+	adf4350_tx.cpCurrent = 6;	
 	adf4350_rx.N = 120;
-	adf4350_rx.rfPower = 0b00;
+	adf4350_rx.rfPower = (BOARD_REVISION >= 3 ? 0b10 : 0b00);
 	adf4350_rx.sendConfig();
 	adf4350_rx.sendN();
 
@@ -197,6 +286,7 @@ static void adf4350_setup() {
 }
 
 static void adf4350_update(freqHz_t freqHz) {
+	adf4350_tx.rfPower = current_props._adf4350_txPower;
 	freqHz = freqHz_t(freqHz/adf4350_freqStep)*adf4350_freqStep;
 	synthesizers::adf4350_set(adf4350_tx, freqHz, adf4350_freqStep);
 	synthesizers::adf4350_set(adf4350_rx, freqHz + lo_freq, adf4350_freqStep);
@@ -215,6 +305,7 @@ static void adf4350_powerup(void) {
 
 // automatically set IF frequency depending on rf frequency and board parameters
 static void updateIFrequency(freqHz_t txFreqHz) {
+#if BOARD_REVISION >= 3	
 	nvic_disable_irq(NVIC_TIM1_UP_IRQ);
 	if(txFreqHz < 40000) { //|| (txFreqHz > 149000000 && txFreqHz < 151000000)) {
 		lo_freq = 6000;
@@ -238,6 +329,7 @@ static void updateIFrequency(freqHz_t txFreqHz) {
 		vnaMeasurement.gainMax = 3;
 	}
 	nvic_enable_irq(NVIC_TIM1_UP_IRQ);
+#endif	
 }
 
 // needed for correct automatic synthwait setting between board versions
@@ -247,32 +339,37 @@ __attribute__((used, noinline)) int calculateSynthWait(bool isSi, int retval) {
 }
 
 // set the measurement frequency including setting the tx and rx synthesizers
-static void setFrequency(freqHz_t freqHz) {
-	currFreqHz = freqHz;
+void setFrequency(freqHz_t freqHz) {
 	updateIFrequency(freqHz);
-	if(!outputRawSamples)	
-		rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(measurementGetDefaultGain(currFreqHz)));
+	// On measure, call phase change before update frequency call, so update gain for frequency range here
+	rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(measurementGetDefaultGain(freqHz)));
 
-	// use adf4350 for f > 140MHz
-	if(is_freq_for_adf4350(freqHz)) {
-		adf4350_update(freqHz);
-		rfsw(RFSW_TXSYNTH, RFSW_TXSYNTH_HF);
-		rfsw(RFSW_RXSYNTH, RFSW_RXSYNTH_HF);
+	/* Only if frequency changes apply the new frequency.
+	 * This is to support proper CW mode:
+	 * changing to an existing frequency temporarily breaks the signal */
+	if(currFreqHz != freqHz) {
+		currFreqHz = freqHz;
+		// use adf4350 for f >= 140MHz
+		if(is_freq_for_adf4350(freqHz)) {
+			adf4350_update(freqHz);
+			rfsw(RFSW_TXSYNTH, RFSW_TXSYNTH_HF);
+			rfsw(RFSW_RXSYNTH, RFSW_RXSYNTH_HF);
 		#ifdef EXPERIMENTAL_SYNTHWAIT
 			vnaMeasurement.nWaitSynth = calculateSynthWaitAF(freqHz);
 		#else
 			vnaMeasurement.nWaitSynth = calculateSynthWait(false, freqHz);
 		#endif
-	} 
-	else {
-		int ret = si5351_update(freqHz);
-		rfsw(RFSW_TXSYNTH, RFSW_TXSYNTH_LF);
-		rfsw(RFSW_RXSYNTH, RFSW_RXSYNTH_LF);
+		} else {
+			int ret = si5351_update(freqHz);
+			rfsw(RFSW_TXSYNTH, RFSW_TXSYNTH_LF);
+			rfsw(RFSW_RXSYNTH, RFSW_RXSYNTH_LF);
+			if(ret < 0 || ret > 2) ret = 2;
 		#ifdef EXPERIMENTAL_SYNTHWAIT
 			vnaMeasurement.nWaitSynth = calculateSynthWaitSI(ret);
 		#else
 			vnaMeasurement.nWaitSynth = calculateSynthWait(true, ret);
 		#endif
+		}
 	}
 }
 
@@ -287,19 +384,24 @@ static void adc_setup() {
 }
 
 // read and consume data from the adc ring buffer
-static void adc_read(uint16_t*& data, int& len) {
+void adc_read(volatile uint16_t*& data, int& len, int modulus=1) {
 	static uint32_t lastIndex = 0;
 	uint32_t cIndex = dmaADC.position();
 	uint32_t bufWords = dmaADC.bufferSizeBytes / 2;
 	cIndex &= (bufWords-1);
+	cIndex = (cIndex / modulus) * modulus;
+	lastIndex = (lastIndex / modulus) * modulus;
 
-	data = ((uint16_t*) dmaADC.buffer) + lastIndex;
-	if(cIndex >= lastIndex) {
+	data = ((volatile uint16_t*) dmaADC.buffer) + lastIndex;
+	if(cIndex >= lastIndex) 
+	{
 		len = cIndex - lastIndex;
 	} 
-	else {
+	else 
+	{
 		len = bufWords - lastIndex;
 	}
+	len = (len/modulus) * modulus;
 	lastIndex += len;
 	if(lastIndex >= bufWords) lastIndex = 0;
 }
@@ -310,7 +412,7 @@ static void adc_read(uint16_t*& data, int& len) {
 #else
 complexf measuredEcal[ECAL_CHANNELS][USB_POINTS_MAX] alignas(8);
 static complexf ecalApplyReflection(complexf refl, int freqIndex) {
-	#ifdef ECAL_PARTIAL
+	#if defined(ECAL_PARTIAL)
 		return refl - measuredEcal[0][freqIndex];
 	#else
 		return SOL_compute_reflection(
@@ -406,7 +508,10 @@ For a description of the command interface see command_parser.hpp
 	- 2: rx port 2
 -- 32: set BB gain
 -- 33: collectData samplesPerPhase[7..0]	
--- 34:			   samplesPerPhase[15..8]					
+-- 34:			   samplesPerPhase[15..8]	
+-- 40: adf4350 power
+-- 41: si5351 power (reserved)
+-- 42: average setting				
 -- f0: device variant (01)
 -- f1: protocol version (01)
 -- f2: hardware revision
@@ -482,7 +587,8 @@ static void cmdReadFIFO(int address, int nValues)
 {
 	if(address != 0x30) 
 		return;	
-	
+
+	if (nValues == 0) nValues = *(uint16_t*)(registers + 0x20);
 	for(int i=0; i<nValues;) {
 		int rdRPos = usbTxQueueRPos;
 		int rdWPos = usbTxQueueWPos;
@@ -493,18 +599,15 @@ static void cmdReadFIFO(int address, int nValues)
 		}
 
 		usbDataPoint& usbDP = usbTxQueue[rdRPos];
-		VNAObservation& value = usbDP.value;
-		if(usbDP.freqIndex < 0 || usbDP.freqIndex > USB_POINTS_MAX)
-			continue;
 
-		value[0] = ecalApplyReflection(value[0] / value[1], usbDP.freqIndex) * value[1];
-
-		int32_t fwdRe = value[1].real();
-		int32_t fwdIm = value[1].imag();
-		int32_t reflRe = value[0].real();
-		int32_t reflIm = value[0].imag();
-		int32_t thruRe = value[2].real();
-		int32_t thruIm = value[2].imag();
+		complexf refl = ecalApplyReflection(usbDP.S11, usbDP.freqIndex);
+		complexf thru = usbDP.S21;
+		int32_t fwdRe = 1073741824;
+		int32_t fwdIm = 0;
+		int32_t reflRe = int32_t(refl.real() * 1073741824.f);
+		int32_t reflIm = int32_t(refl.imag() * 1073741824.f);
+		int32_t thruRe = int32_t(thru.real() * 1073741824.f);
+		int32_t thruIm = int32_t(thru.imag() * 1073741824.f);		
 
 		uint8_t txbuf[32];
 		txbuf[0] = uint8_t(fwdRe >> 0);
@@ -570,6 +673,7 @@ static void setVNASweepToUSB() {
 	if(points > USB_POINTS_MAX)
 		points = USB_POINTS_MAX;
 
+#if BOARD_REVISION < 4
 	vnaMeasurement.sweepStartHz = (freqHz_t)*(uint64_t*)(registers + 0x00);
 	vnaMeasurement.sweepStepHz = (freqHz_t)*(uint64_t*)(registers + 0x10);
 	vnaMeasurement.sweepDataPointsPerFreq = values;
@@ -578,6 +682,19 @@ static void setVNASweepToUSB() {
 	if(outputRawSamples) {
 		setFrequency((freqHz_t)*(uint64_t*)(registers + 0x00));
 	}	
+#else
+	currTimingsArgs.nAverage = 1;
+	sys_syscall(5, &currTimingsArgs);
+	setHWSweep(sys_setSweep_args {
+		(freqHz_t)*(uint64_t*)(registers + 0x00),
+		(freqHz_t)*(uint64_t*)(registers + 0x10),
+		points,
+		values
+	});
+	if(outputRawSamples) {
+		// TODO: syscall: stop sweep
+	}	
+#endif	
 }
 
 static void measurementPhaseChanged(VNAMeasurementPhases ph);
@@ -699,9 +816,6 @@ static void cmdInit() {
 }
 
 static int measurementGetDefaultGain(freqHz_t freqHz) {
-	if(lo_freq == 150000)
-		return 3; // always use highest gain with 150 kHz IF
-	
 	if(freqHz > 2500000000)
 		return 2;
 	else if(freqHz > FREQUENCY_CHANGE_OVER)
@@ -744,26 +858,171 @@ static void measurementPhaseChanged(VNAMeasurementPhases ph) {
 	}
 }
 
-// callback called by VNAMeasurement when an observation is available.
-static void measurementEmitDataPoint(int freqIndex, freqHz_t freqHz, VNAObservation v, const complexf* ecal) {
-	digitalWrite(led, vnaMeasurement.clipFlag?1:0);
+// Allow smooth complex data point array (this remove noise, smooth power depend form count)
+static void measurementDataSmooth(complexf *data, int points, int count){
+	int j;
+	while(count--){
+		complexf prev = data[0];
+		// first point smooth
+		data[0] = (prev + prev + data[1])/3.0f;
+		for (j=1;j<points-1;j++){
+			complexf old = data[j]; // save current data point for next point smooth
+			data[j] = (prev + data[j] + data[j] + data[j+1])/4.0f;
+			prev = old;
+		}
+		// last point smooth
+		data[j] = (data[j] + data[j] + prev)/3.0f;
+	}
+}
+int currDPCnt = 0;
+int lastFreqIndex = -1;
+VNAObservation currDP;
 
-	v[2] *= gainTable[currThruGain] / gainTable[measurementGetDefaultGain(freqHz)];
+#define USE_FIXED_CORRECTION
+// callback called by VNAMeasurement when an observation is available.
+static void measurementEmitDataPoint(int freqIndex, freqHz_t freqHz, VNAObservation v, const complexf* ecal, bool clipped) {
+	digitalWrite(led, clipped?1:0);
+	bool collectAllowed = true;
+
+#if BOARD_REVISION < 4
+	v[2]*= gainTable[vnaMeasurement.currThruGain] / gainTable[measurementGetDefaultGain(freqHz)];
+#ifdef USE_FIXED_CORRECTION
 	v[2] = applyFixedCorrectionsThru(v[2], freqHz);
 	v[0] = applyFixedCorrections(v[0]/v[1], freqHz) * v[1];
+#endif
+	currDPCnt++;
+	if(freqIndex != lastFreqIndex) {
+		currDPCnt = 0;
+		lastFreqIndex = freqIndex;
+	}
 
+	if(currSweepArgs.dataPointsPerFreq > 1 && !usbDataMode) {
+		if(currDPCnt == 0) {
+			currDP = v;
+		} else {
+			currDP[0] += v[0];
+			currDP[1] += v[1];
+			currDP[2] += v[2];
+		}
+		if(currDPCnt == (currSweepArgs.dataPointsPerFreq - 1)) {
+			v = currDP;
+		} else {
+			return;
+		}
+	}
 	
+
+	//v[0] = powf(10, currThruGain/20.f)*v[1];
+	//ecal = nullptr;
+
+#ifndef BOARD_DISABLE_ECAL
+	int ecalIgnoreValues2 = ecalIgnoreValues;
+	if(ecalIgnoreValues2 != 0) {
+		ecal = nullptr;
+		__sync_bool_compare_and_swap(&ecalIgnoreValues, ecalIgnoreValues2, ecalIgnoreValues2-1);
+	}
+	collectAllowed = (ecal != nullptr);
+	if(ecal != nullptr) {
+		complexf scale = complexf(1., 0.)/v[1];
+		auto ecal0 = ecal[0] * scale;
+#ifdef USE_FIXED_CORRECTION
+		ecal0 = applyFixedCorrections(ecal0, freqHz);
+#endif
+		if(collectMeasurementType >= 0) {
+			// we are collecting a measurement for calibration
+			measuredEcal[0][freqIndex] = ecal0;
+#ifndef ECAL_PARTIAL
+			measuredEcal[1][freqIndex] = ecal[1] * scale;
+			measuredEcal[2][freqIndex] = ecal[2] * scale;
+#endif
+		} else {
+			if(ecalState == ECAL_STATE_DONE) {
+				// Noise Filtering k = 0.8
+				measuredEcal[0][freqIndex] = measuredEcal[0][freqIndex] * 0.8f + ecal0 * 0.2f;
+				#ifndef ECAL_PARTIAL
+					scale *= 0.2f;
+					measuredEcal[1][freqIndex] = measuredEcal[1][freqIndex] * 0.8f + ecal[1] * scale;
+					measuredEcal[2][freqIndex] = measuredEcal[2][freqIndex] * 0.8f + ecal[2] * scale;
+				#endif
+			} else {
+				measuredEcal[0][freqIndex] = ecal0;
+				#ifndef ECAL_PARTIAL
+					measuredEcal[1][freqIndex] = ecal[1] * scale;
+					measuredEcal[2][freqIndex] = ecal[2] * scale;
+				#endif
+			}
+			if(ecalState == ECAL_STATE_MEASURING
+					&& freqIndex == vnaMeasurement.sweepPoints - 1) {
+				ecalState = ECAL_STATE_2NDSWEEP;
+			} else if(ecalState == ECAL_STATE_2NDSWEEP) {
+				ecalState = ECAL_STATE_DONE;
+				vnaMeasurement.ecalIntervalPoints = MEASUREMENT_ECAL_INTERVAL;
+				vnaMeasurement.measurement_mode = (enum MeasurementMode) current_props._measurement_mode;
+				measurementDataSmooth(measuredEcal[0], vnaMeasurement.sweepPoints, 16);
+				#ifndef ECAL_PARTIAL
+					measurementDataSmooth(measuredEcal[1], vnaMeasurement.sweepPoints, 16);
+					measurementDataSmooth(measuredEcal[2], vnaMeasurement.sweepPoints, 16);
+				#endif
+			}
+		}
+	}
+#endif
+#endif
+
+	if(collectMeasurementType >= 0 && collectAllowed) {
+		// we are collecting a measurement for calibration
+
+		auto refl = ecalApplyReflection(v[0]/v[1], freqIndex);
+		current_props._cal_data[collectMeasurementType][freqIndex] = refl;
+
+		auto tmp = v[2]/v[1];
+		if(collectMeasurementType == CAL_OPEN)
+			current_props._cal_data[CAL_ISOLN_OPEN][freqIndex] = tmp;
+		else if(collectMeasurementType == CAL_SHORT)
+			current_props._cal_data[CAL_ISOLN_SHORT][freqIndex] = tmp;
+		else if(collectMeasurementType == CAL_THRU) {
+			current_props._cal_data[CAL_THRU_REFL][freqIndex] = refl;
+			current_props._cal_data[CAL_THRU][freqIndex] = tmp;
+		}
+		// Collect measure start from freqIndex, need collect all data
+		if(collectMeasurementState == 0) {
+			collectMeasurementState = 1;
+			collectMeasurementOffset = freqIndex > 0 ? freqIndex - 1 : vnaMeasurement.sweepPoints - 1;
+		} else if(collectMeasurementState == 1 && collectMeasurementOffset == freqIndex) {
+			collectMeasurementState = 0;
+#if 0
+			// Made smooth result for calibration
+			int count = 4;
+			if(collectMeasurementType == CAL_LOAD)
+				measurementDataSmooth(current_props._cal_data[CAL_LOAD], vnaMeasurement.sweepPoints, count);
+			else if(collectMeasurementType == CAL_OPEN){
+				measurementDataSmooth(current_props._cal_data[CAL_OPEN], vnaMeasurement.sweepPoints, count);
+				measurementDataSmooth(current_props._cal_data[CAL_ISOLN_OPEN], vnaMeasurement.sweepPoints, count*8);
+			}
+			else if(collectMeasurementType == CAL_SHORT){
+				measurementDataSmooth(current_props._cal_data[CAL_SHORT], vnaMeasurement.sweepPoints, count);
+				measurementDataSmooth(current_props._cal_data[CAL_ISOLN_SHORT], vnaMeasurement.sweepPoints, count*8);
+			}
+//			else if(collectMeasurementType == CAL_THRU) { // Not need smooth thru calibration, no noise,
+//				measurementDataSmooth(current_props._cal_data[CAL_THRU_REFL], vnaMeasurement.sweepPoints, count);
+//				measurementDataSmooth(current_props._cal_data[CAL_THRU], vnaMeasurement.sweepPoints, count);
+//			}
+#endif
+			collectMeasurementType = -1;
+			eventQueue.enqueue(collectMeasurementCB);
+		}
+	}
 	// enqueue new data point
 	int wrRPos = usbTxQueueRPos;
 	int wrWPos = usbTxQueueWPos;
 	__sync_synchronize();
 	if(((wrWPos + 1) & usbTxQueueMask) == wrRPos) {
 		// overflow
-		// discard value
-	} 
-	else {
+	} else {
 		usbTxQueue[wrWPos].freqIndex = freqIndex;
-		usbTxQueue[wrWPos].value = v;
+		//usbTxQueue[wrWPos].value = v;
+		usbTxQueue[wrWPos].S11 = v[0]/v[1];
+		usbTxQueue[wrWPos].S21 = v[2]/v[1];
 		__sync_synchronize();
 		usbTxQueueWPos = (wrWPos + 1) & usbTxQueueMask;
 	}
@@ -780,11 +1039,10 @@ static void measurement_setup() {
 		measurementPhaseChanged(ph);
 	};
 	vnaMeasurement.gainChanged = [](int gain) {
-		currThruGain = gain;
-		rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(currThruGain));
+		rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(gain));
 	};
 	vnaMeasurement.emitDataPoint = [](int freqIndex, freqHz_t freqHz, const VNAObservation& v, const complexf* ecal) {
-		measurementEmitDataPoint(freqIndex, freqHz, v, ecal);
+		measurementEmitDataPoint(freqIndex, freqHz, v, ecal, vnaMeasurement.clipFlag);
 	};
 	vnaMeasurement.frequencyChanged = [](freqHz_t freqHz) {
 		setFrequency(freqHz);
@@ -802,23 +1060,16 @@ static void measurement_setup() {
 		}
 	};
 	vnaMeasurement.nPeriods = MEASUREMENT_NPERIODS_NORMAL;
+	vnaMeasurement.nPeriodsCalibrating = MEASUREMENT_NPERIODS_CALIBRATING;
+	vnaMeasurement.nWaitSwitch = MEASUREMENT_NWAIT_SWITCH;
 	vnaMeasurement.gainMin = 0;
 	vnaMeasurement.gainMax = RFSW_BBGAIN_MAX;
 	vnaMeasurement.init();
-	
-	rawVnaMeasurement.phaseChanged = [](VNAMeasurementPhases ph) {
-		measurementPhaseChanged(ph);
-	};	
-	rawVnaMeasurement.emitData = [](){
-		rawMeasurementEmitData();
-	};
-	rawVnaMeasurement.ADCValueQueue = &ADCValueQueue;
-	rawVnaMeasurement.init();
 }
 
 
 static void adc_process() {
-	uint16_t* buf;
+	volatile uint16_t* buf;
 	int len;
 	for(int i=0; i<2; i++) {
 		adc_read(buf, len);

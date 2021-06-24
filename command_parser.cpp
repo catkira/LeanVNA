@@ -35,7 +35,7 @@ void CommandParser::handleInput(const uint8_t* s, int len) {
 				cmdEndAddress = cmdAddress + 8;
 
 			// 1-parameter commands
-			if(cmdOpcode >= 0x10 && cmdOpcode <= 0x12) {
+			if(cmdOpcode >= 0x10 && cmdOpcode <= 0x13) {
 				uint8_t* rPtr = registers + (cmdAddress & registersSizeMask);
 				switch(cmdOpcode) {
 					case 0x10:
@@ -61,6 +61,7 @@ void CommandParser::handleInput(const uint8_t* s, int len) {
 		// 2 or more parameter commands
 		switch(cmdOpcode) {
 			case 0x18:
+			case 0x13: // FOR TEMPORARY BACKWARDS COMPATIBILITY ONLY. WILL BE REMOVED.			
 				handleReadFIFO(cmdAddress, c);
 				cmdPhase = 0;
 				break;
