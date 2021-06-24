@@ -1,3 +1,4 @@
+#pragma once
 #include <mculib/small_function.hpp>
 #include <stdint.h>
 

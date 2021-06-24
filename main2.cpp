@@ -49,6 +49,18 @@
 #include <libopencm3/cm3/scb.h>
 #include <libopencm3/cm3/vector.h>
 
+
+// unity build
+#include "command_parser.cpp"
+#include "vna_measurement.cpp"
+#include "globals.cpp"
+#include "stream_fifo.cpp"
+#include "flash.cpp"
+#include "gain_cal.cpp"
+#include "sin_rom.cpp"
+#include "common.cpp"
+#include "synthesizers.cpp"
+
 using namespace mculib;
 using namespace std;
 using namespace board;
@@ -932,7 +944,9 @@ static void measurementEmitDataPoint(int freqIndex, freqHz_t freqHz, VNAObservat
 			measuredEcal[1][freqIndex] = ecal[1] * scale;
 			measuredEcal[2][freqIndex] = ecal[2] * scale;
 #endif
-		} else {
+		} 
+		else 
+		{
 			if(ecalState == ECAL_STATE_DONE) {
 				// Noise Filtering k = 0.8
 				measuredEcal[0][freqIndex] = measuredEcal[0][freqIndex] * 0.8f + ecal0 * 0.2f;
@@ -941,7 +955,9 @@ static void measurementEmitDataPoint(int freqIndex, freqHz_t freqHz, VNAObservat
 					measuredEcal[1][freqIndex] = measuredEcal[1][freqIndex] * 0.8f + ecal[1] * scale;
 					measuredEcal[2][freqIndex] = measuredEcal[2][freqIndex] * 0.8f + ecal[2] * scale;
 				#endif
-			} else {
+			} 
+			else 
+			{
 				measuredEcal[0][freqIndex] = ecal0;
 				#ifndef ECAL_PARTIAL
 					measuredEcal[1][freqIndex] = ecal[1] * scale;
@@ -951,7 +967,9 @@ static void measurementEmitDataPoint(int freqIndex, freqHz_t freqHz, VNAObservat
 			if(ecalState == ECAL_STATE_MEASURING
 					&& freqIndex == vnaMeasurement.sweepPoints - 1) {
 				ecalState = ECAL_STATE_2NDSWEEP;
-			} else if(ecalState == ECAL_STATE_2NDSWEEP) {
+			} 
+			else if(ecalState == ECAL_STATE_2NDSWEEP) 
+			{
 				ecalState = ECAL_STATE_DONE;
 				vnaMeasurement.ecalIntervalPoints = MEASUREMENT_ECAL_INTERVAL;
 				vnaMeasurement.measurement_mode = (enum MeasurementMode) current_props._measurement_mode;
@@ -1015,7 +1033,9 @@ static void measurementEmitDataPoint(int freqIndex, freqHz_t freqHz, VNAObservat
 	__sync_synchronize();
 	if(((wrWPos + 1) & usbTxQueueMask) == wrRPos) {
 		// overflow
-	} else {
+	} 
+	else 
+	{
 		usbTxQueue[wrWPos].freqIndex = freqIndex;
 		//usbTxQueue[wrWPos].value = v;
 		usbTxQueue[wrWPos].S11 = v[0]/v[1];

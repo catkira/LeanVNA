@@ -7,14 +7,12 @@ BOARDNAME		= board_v2_3
 DEVICE          = gd32f303cc_nofpu
 
 
-OBJS			+= main2.o $(BOARDNAME)/board.o vna_measurement.o common.o synthesizers.o gitversion.hpp
-OBJS			+= globals.o flash.o command_parser.o stream_fifo.o
-OBJS			+= sin_rom.o gain_cal.o
+OBJS			+= main2.o $(BOARDNAME)/board.o gitversion.hpp
 OBJS            += $(MCULIB)/message_log.o $(MCULIB)/printf.o $(MCULIB)/fastwiring.o $(MCULIB)/si5351.o $(MCULIB)/dma_adc.o $(MCULIB)/dma_driver.o $(MCULIB)/usbserial.o
 
 CFLAGS          += -O2 -g
 CPPFLAGS		+= -O2 -g -ffast-math -fstack-protector-strong -I$(BOARDNAME) -I$(MCULIB)/include -DMCULIB_DEVICE_STM32F103 -DSTM32F103 -DSTM32F1 -D_XOPEN_SOURCE=600
-CPPFLAGS		+= -Wall -Wno-unused-function
+CPPFLAGS		+= -Wall -Wno-unused-function -Werror=implicit-fallthrough
 #CPPFLAGS		+= -DDISPLAY_ST7796
 CPPFLAGS		+=  -ffunction-sections -fdata-sections
 #C++ only flags, CPP is used for both C++ and C files
