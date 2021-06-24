@@ -101,7 +101,7 @@ namespace board {
 		  * Do this before touching the PLL (TODO: why?).
 		  */
 		 rcc_set_hpre(RCC_CFGR_HPRE_SYSCLK_NODIV);					// Set. 96MHz Max. 96MHz
-		 rcc_set_adcpre_gd32(GD32_RCC_CFGR_ADCPRE_PCLK2_DIV4);		// Set. 24MHz Max. 40MHz
+		 rcc_set_adcpre_gd32(GD32_RCC_CFGR_ADCPRE_PCLK2_DIV16);		// Set. 6MHz Max. 40MHz
 		 rcc_set_ppre1(RCC_CFGR_PPRE1_HCLK_DIV2);					// Set. 48MHz Max. 60MHz
 		 rcc_set_ppre2(RCC_CFGR_PPRE2_HCLK_NODIV);					// Set. 96MHz Max. 120MHz
 		 rcc_set_usbpre_gd32(3);									// 96MHz / 2 = 48MHz
@@ -141,24 +141,28 @@ namespace board {
 	}
 
 	void rcc_clock_setup_in_hse_24mhz_out_120mhz(void) {
+		 cpu_mhz = 120;
+		 // only run the initialization once
+		 if(RCC_CR & RCC_CR_HSEON) return;
+
 		 /* Enable internal high-speed oscillator. */
 		 rcc_osc_on(RCC_HSI);
 		 rcc_wait_for_osc_ready(RCC_HSI);
-
-		 /* Select HSI as SYSCLK source. */
-		 rcc_set_sysclk_source(RCC_CFGR_SW_SYSCLKSEL_HSICLK);
 
 		 /* Enable external high-speed oscillator. */
 		 rcc_osc_on(RCC_HSE);
 		 rcc_wait_for_osc_ready(RCC_HSE);
 		 rcc_set_sysclk_source(RCC_CFGR_SW_SYSCLKSEL_HSECLK);
 
+		 /* Select HSI as SYSCLK source. */
+		 rcc_set_sysclk_source(RCC_CFGR_SW_SYSCLKSEL_HSICLK);
+		 rcc_osc_off(RCC_PLL);
 		 /*
 		  * Set prescalers for AHB, ADC, ABP1, ABP2.
 		  * Do this before touching the PLL (TODO: why?).
 		  */
 		 rcc_set_hpre(RCC_CFGR_HPRE_SYSCLK_NODIV);					// Set. 120MHz Max. 120MHz
-		 rcc_set_adcpre_gd32(GD32_RCC_CFGR_ADCPRE_HCLK_DIV5);		// Set. 20MHz Max. 40MHz
+		 rcc_set_adcpre_gd32(GD32_RCC_CFGR_ADCPRE_PCLK2_DIV4);		// Set. 30MHz Max. 40MHz
 		 rcc_set_ppre1(RCC_CFGR_PPRE1_HCLK_DIV2);					// Set. 60MHz Max. 60MHz
 		 rcc_set_ppre2(RCC_CFGR_PPRE2_HCLK_NODIV);					// Set. 120MHz Max. 120MHz
 		 rcc_set_usbpre_gd32(2);									// 120MHz / 2.5 = 48MHz
@@ -193,23 +197,9 @@ namespace board {
 		 rcc_ahb_frequency = 120000000;
 		 rcc_apb1_frequency = 60000000;
 		 rcc_apb2_frequency = 120000000;
-
-		 cpu_mhz = 120;
 	}
 
 	void boardInit() {
-		hseEstimateHz = detectHSEFreq();
-		if(21466200 < hseEstimateHz && hseEstimateHz < 27712800)
-		{
-			/* 24Mhz HSE detected */
-		}
-		else {
-			/* Error HSE is at an unexpected frequency.
-			 * TODO how do we handle this? 
-			 * Is it worth to boot using internal 8 Mhz, and start display
-			 * to tell something is terribly wrong?
-			 */
-		}
 		rcc_clock_setup_in_hse_24mhz_out_120mhz();
 
 		// enable basic peripherals
