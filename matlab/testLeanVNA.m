@@ -38,8 +38,8 @@ function testLeanVNA
         vna.adf4350Power(1);        
     end
     
-    %vna.Si5351RxPower(1);
-    %vna.Si5351TxPower(1);
+    vna.Si5351RxPower(1);
+    vna.Si5351TxPower(1);
 
     
     for f = fStart:(fEnd-fStart)/(nPoints-1):fEnd

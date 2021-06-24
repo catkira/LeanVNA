@@ -44,8 +44,8 @@ namespace synthesizers {
 	// freqHz must be a multiple of freqStepHz
 	template<class T>
 	static void adf4350_set(T& adf4350, freqHz_t freqHz, uint32_t freqStepHz) {
-		int O = 1;
-		int R = 1; // adf4350 reference divide
+		uint32_t O = 1;
+		uint32_t R = 1; // adf4350 reference divide
 		
 		if(freqHz	> 2200000000)
 			O = 1;

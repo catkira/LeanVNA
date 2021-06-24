@@ -817,11 +817,11 @@ static void cmdRegisterWrite(int address) {
 	if(address == 0x36)
 	{
 		auto val = *(uint16_t*)(registers + 0x36);
-		synthesizers::si5351_tx_powerCmd((bool)val);  // TODO: does not seem to work
+		synthesizers::si5351_tx_powerCmd((bool)val);
 	}		
 	if(address == 0x37)
 	{
-		auto val = *(uint16_t*)(registers + 0x37);    // TODO: does not seem to work
+		auto val = *(uint16_t*)(registers + 0x37);
 		synthesizers::si5351_rx_powerCmd((bool)val);
 	}		
 	
@@ -1262,19 +1262,13 @@ int main(void) {
 	bool si5351failed = false;
 	
 #if BOARD_REVISION < 4
+	si5351_i2c.init();
 	if(!synthesizers::si5351_setup())
 		si5351failed = true;
-	if(!synthesizers::si5351_setup()) {
-		printk1("ERROR: si5351 init failed\n");
-		printk1("Touch anywhere to continue...\n");
-		//show_dmesg();
-	}
-
 
 	setFrequency(56000000);
 	updateIFrequency(300000);
 
-	
 	// initialize VNAMeasurement
 	measurement_setup();
 	adc_setup();

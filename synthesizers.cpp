@@ -77,7 +77,7 @@ namespace synthesizers {
 
 		pllFreqHz = xtalFreqHz * mult;
 
-		int divInputFreqHz = pllFreqHz;
+		uint32_t divInputFreqHz = pllFreqHz;
 
 		if(rxFreqHz < 500000) { /* Below 500Khz */
 			rDiv = CLK_R_Div128;

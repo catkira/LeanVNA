@@ -14,9 +14,9 @@ function rxTest
     vna.enterRawMode();
     
     vna.selectPath(3);
-    %vna.Si5351TxPower(1);
-    %vna.Si5351RxPower(1);
-    vna.setFrequency(140E6);
+    vna.Si5351TxPower(1);
+    vna.Si5351RxPower(1);
+    vna.setFrequency(130E6);
     vna.setGain(3);
     pause()
 
