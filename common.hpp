@@ -48,11 +48,22 @@ typedef int64_t freqHz_t;
 // The ADF4350 lower limit is 137Mhz, so it must be above 137Mhz
 static constexpr uint32_t FREQUENCY_CHANGE_OVER	= 140000000;
 #define SWEEP_POINTS_MIN 2
+#ifndef SWEEP_POINTS_MAX
 #define SWEEP_POINTS_MAX 201
-#define USB_POINTS_MAX 1024
+#endif
+
 #define TRACES_MAX 4
 #define MARKERS_MAX 4
+
+// Set FFT size depend from max points count
+#if SWEEP_POINTS_MAX < 256
+#define FFT_SIZE 256
+#elif SWEEP_POINTS_MAX < 512
 #define FFT_SIZE 512
+#else
+#error "Need update FFT table for more points size"
+#endif
+
 #define ECAL_PARTIAL
 
 #ifdef ECAL_PARTIAL
@@ -61,6 +72,28 @@ static constexpr uint32_t FREQUENCY_CHANGE_OVER	= 140000000;
 #define ECAL_CHANNELS 3
 #endif
 
+#define CAL_ENTRIES 7
+#define CAL_LOAD 0
+#define CAL_OPEN 1
+#define CAL_SHORT 2
+#define CAL_THRU 3
+#define CAL_ISOLN_OPEN 4
+#define CAL_ISOLN_SHORT 5
+#define CAL_THRU_REFL 6
+
+#define CALSTAT_LOAD (1<<0)
+#define CALSTAT_OPEN (1<<1)
+#define CALSTAT_SHORT (1<<2)
+#define CALSTAT_THRU (1<<3)
+#define CALSTAT_ISOLN (1<<4)
+#define CALSTAT_ES (1<<5)
+#define CALSTAT_ER (1<<6)
+#define CALSTAT_ET (1<<7)
+#define CALSTAT_ED CALSTAT_LOAD
+#define CALSTAT_EX CALSTAT_ISOLN
+#define CALSTAT_APPLY (1<<8)
+#define CALSTAT_INTERPOLATED (1<<9)
+#define CALSTAT_ENHANCED_RESPONSE (1<<10)
 
 #define ETERM_ED 0 /* error term directivity */
 #define ETERM_ES 1 /* error term source match */
@@ -84,24 +117,45 @@ struct alignas(4) properties_t {
   int16_t _sweep_points;
   uint16_t _cal_status;
 
+  complexf _cal_data[CAL_ENTRIES][SWEEP_POINTS_MAX];
   float _electrical_delay; // picoseconds
 
   float _velocity_factor; // %
-  int _active_marker;
-  uint8_t _domain_mode; /* 0bxxxxxffm : where ff: TD_FUNC m: DOMAIN_MODE */
-  uint8_t _marker_smith_format;
   uint8_t _avg;
   uint8_t _adf4350_txPower; // 0 to 3
   uint8_t _si5351_txPower; // 0 to 3
   uint8_t _measurement_mode; //See enum MeasurementMode.
 
   uint32_t checksum;
+
+  // overwrite all fields of this instance with factory default values
+  void setFieldsToDefault();
+
+  // clear calibration data
+  void setCalDataToDefault();
+
+  properties_t() { setFieldsToDefault(); }
+  freqHz_t startFreqHz() const {
+    if(_frequency1 > 0) return _frequency0;
+    return _frequency0 + _frequency1/2;
+  }
+  freqHz_t stopFreqHz() const {
+    if(_frequency1 > 0) return _frequency1;
+    return _frequency0 - _frequency1/2;
+  }
+  freqHz_t stepFreqHz() const {
+    if(_sweep_points > 0)
+      return (stopFreqHz() - startFreqHz()) / (_sweep_points - 1);
+    return 0;
+  }
+
+  void do_cal_reset(int calType, complexf val);
 };
 
 typedef struct {
   uint32_t magic;
   uint16_t dac_value; // unused
-  int32_t checksum;
+  uint32_t checksum;
 } config_t;
 
 

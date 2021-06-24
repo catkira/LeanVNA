@@ -26,6 +26,12 @@ public:
 		return !(_wpos == _rpos);
 	}
 
+	// peek at next value
+	T& read() {
+		__sync_synchronize();
+		return elements[_rpos];
+	}	
+
 	T dequeue() {
 		if(!readable())
 			abort();

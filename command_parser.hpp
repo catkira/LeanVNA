@@ -1,4 +1,3 @@
-#pragma once
 #include <mculib/small_function.hpp>
 #include <stdint.h>
 
@@ -11,6 +10,7 @@
 -- 10 AA                : read register (address in AA)
 -- 11 AA                : read 2-byte register (address in AA)
 -- 12 AA                : read 4-byte register (address in AA)
+-- 13 AA 				: read 8-byte register (address in AA)
 -- 18 AA NN             : read up to N values from FIFO (bytes per value is implementation defined)
 -- 20 AA XX             : write register (address in AA, value in XX)
 -- 21 AA XX XX          : write 2-byte register (address in AA, values in XX)
