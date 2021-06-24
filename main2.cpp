@@ -101,6 +101,8 @@ static constexpr int tim1Period = 25;	// 1MHz / 25 = 40kHz
 // value is in microseconds; increments at 40kHz by TIM1 interrupt
 volatile uint32_t systemTimeCounter = 0;
 
+static FIFO<small_function<void()>, 8> eventQueue;
+
 static freqHz_t currFreqHz = 0;		// current hardware tx frequency
 
 // if nonzero, any ecal data in the next ecalIgnoreValues data points will be ignored.

@@ -54,4 +54,7 @@ extern volatile EcalStates ecalState;
 #define velocity_factor current_props._velocity_factor
 #define marker_smith_format current_props._marker_smith_format
 
-
+extern volatile int MEASUREMENT_NPERIODS_NORMAL;
+extern volatile int MEASUREMENT_NPERIODS_CALIBRATING;
+extern volatile int MEASUREMENT_ECAL_INTERVAL;
+extern volatile int MEASUREMENT_NWAIT_SWITCH;

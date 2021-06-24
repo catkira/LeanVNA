@@ -101,14 +101,15 @@ static constexpr uint32_t FREQUENCY_CHANGE_OVER	= 140000000;
 #define ETERM_ET 3 /* error term transmission tracking */
 #define ETERM_EX 4 /* error term isolation */
 
+/* Determines the measurements the ADC will do. */
+enum MeasurementMode {
+    MEASURE_MODE_FULL, //Including ECAL, slowest
+    MEASURE_MODE_REFL_THRU, //Does not switch the output, use for CW mode
+    MEASURE_MODE_REFL_THRU_REFRENCE, //No ecal
+};
 
 constexpr uint32_t BOOTLOADER_DFU_MAGIC = 0xdeadbabe;
 static volatile uint32_t& bootloaderDFUIndicator = *(uint32_t*)(0x20000000 + 48*1024 - 4);
-
-constexpr int MEASUREMENT_NPERIODS_NORMAL = 14;
-constexpr int MEASUREMENT_NPERIODS_CALIBRATING = 30;
-constexpr int MEASUREMENT_ECAL_INTERVAL = 5;
-
 
 struct alignas(4) properties_t {
   uint32_t magic;
@@ -167,13 +168,6 @@ static inline bool is_freq_for_adf4350(freqHz_t freq)
 {
 	return freq > FREQUENCY_CHANGE_OVER;
 }
-
-/* Determines the measurements the ADC will do. */
-enum MeasurementMode {
-    MEASURE_MODE_FULL, //Including ECAL, slowest
-    MEASURE_MODE_REFL_THRU, //Does not switch the output, use for CW mode
-    MEASURE_MODE_REFL_THRU_REFRENCE, //No ecal
-};
 
 // convert vbat [mV] to battery indicator
 static inline uint8_t vbat2bati(int16_t vbat)
