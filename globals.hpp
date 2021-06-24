@@ -14,11 +14,7 @@ constexpr int registerSize = 256;
 constexpr int registersSizeMask = registerSize - 1;
 extern uint8_t registers[registerSize];
 
-extern uint16_t redraw_request;
 extern volatile bool sweep_enabled;
-
-
-extern int16_t vbat;
 
 extern int16_t lastsaveid;
 extern properties_t current_props;
@@ -45,13 +41,9 @@ extern volatile EcalStates ecalState;
 #define cal_status current_props._cal_status
 #define frequencies current_props._frequencies
 #define cal_data current_props._cal_data
-#define electrical_delay current_props._electrical_delay
 
 #define trace current_props._trace
-#define markers current_props._markers
-#define active_marker current_props._active_marker
 #define domain_mode current_props._domain_mode
-#define velocity_factor current_props._velocity_factor
 #define marker_smith_format current_props._marker_smith_format
 
 extern volatile int MEASUREMENT_NPERIODS_NORMAL;

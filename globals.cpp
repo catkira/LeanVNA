@@ -2,7 +2,6 @@
 #include <board.hpp>
 
 volatile bool sweep_enabled = true;
-int16_t vbat;
 
 uint8_t registers[registerSize];
 
@@ -10,7 +9,6 @@ int16_t lastsaveid = 0;
 
 config_t config = {
   .magic =             CONFIG_MAGIC,
-  .dac_value =         1922,
   .checksum =          0
 };
 

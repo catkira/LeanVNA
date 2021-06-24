@@ -6,7 +6,8 @@ function rxTest
 
     Fs=1200000; % sample rate of ADC is 300 kHz
     loFreq = 150000;
-    numValues = 2048;
+    %numValues = 2048;
+    numValues = 1024;
 
     vna = LeanVNA;
     vna.openConnection();   

@@ -72,8 +72,8 @@ static const int adcBufSize=1024;	// must be power of 2
 static volatile uint16_t adcBuffer[adcBufSize];
 
 static VNAMeasurement vnaMeasurement;
-//static FIFO<uint16_t,8192> ADCValueQueue;
-static FIFO<uint16_t,4096> ADCValueQueue;
+static FIFO<uint16_t,8192> ADCValueQueue;
+//static FIFO<uint16_t,4096> ADCValueQueue;
 static RawVNAMeasurement<decltype(ADCValueQueue)> rawVnaMeasurement;
 static CommandParser cmdParser;
 static StreamFIFO cmdInputFIFO;
@@ -84,7 +84,6 @@ static float gainTable[RFSW_BBGAIN_MAX+1];
 
 __attribute__((packed))
 struct usbDataPoint {
-	//VNAObservation value;
 	complexf S11, S21;
 	int freqIndex;
 };
@@ -97,9 +96,6 @@ static volatile int usbTxQueueRPos = 0;
 
 // periods of a 1MHz clock; how often to call adc_process()
 static constexpr int tim1Period = 25;	// 1MHz / 25 = 40kHz
-
-// value is in microseconds; increments at 40kHz by TIM1 interrupt
-volatile uint32_t systemTimeCounter = 0;
 
 static FIFO<small_function<void()>, 8> eventQueue;
 
@@ -253,7 +249,6 @@ static void dsp_timer_setup() {
 
 extern "C" void tim1_up_isr() {
 	TIM1_SR = 0;
-	systemTimeCounter += tim1Period;
 	adc_process();
 }
 
@@ -326,7 +321,7 @@ static void updateIFrequency(freqHz_t txFreqHz) {
 	} else {
 		lo_freq = 150000;
 		adf4350_freqStep = 10000;
-		vnaMeasurement.setCorrelationTable(sinROM8x8, 64);
+		vnaMeasurement.setCorrelationTable(sinROM10x2, 20);
 		vnaMeasurement.adcFullScale = 10000 * 48 * 20;
 		vnaMeasurement.gainMax = 3;
 	}
@@ -1120,21 +1115,6 @@ bool cpu_enable_fpu(void)
 }
 
 int main(void) {
-	bool shouldShowDmesg = false;
-
-#ifndef GD32F3_NOFPU
-	if(cpu_enable_fpu()) {
-		printk1("LIBOPENCM3 DID NOT ENABLE FPU!\n CHECK lib/dispatch/vector_chipset.c\n");
-	} else {
-		// printk1() does not invoke printf() and does not use fpu
-
-		// if you encounter this error, see:
-		// https://www.amobbs.com/thread-5719892-1-1.html
-		printk1("FPU NOT DETECTED!\nCHECK GD32F303 BATCH OR REBUILD WITHOUT FPU\n");
-		shouldShowDmesg = true;
-	}
-#endif
-
 
 	boardInit();
 
@@ -1199,13 +1179,6 @@ int main(void) {
 	delay(50);
 	
 	flash_config_recall();
-
-
-	// show dmesg and wait for user input if there is an important error
-	if(shouldShowDmesg) {
-		printk1("Touch anywhere to continue...\n");
-		//show_dmesg();
-	}
 
 	printk("xtal freq %d.%03d MHz\n", (xtalFreqHz/1000000), ((xtalFreqHz/1000) % 1000));
 

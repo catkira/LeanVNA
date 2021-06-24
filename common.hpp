@@ -55,15 +55,6 @@ static constexpr uint32_t FREQUENCY_CHANGE_OVER	= 140000000;
 #define TRACES_MAX 4
 #define MARKERS_MAX 4
 
-// Set FFT size depend from max points count
-#if SWEEP_POINTS_MAX < 256
-#define FFT_SIZE 256
-#elif SWEEP_POINTS_MAX < 512
-#define FFT_SIZE 512
-#else
-#error "Need update FFT table for more points size"
-#endif
-
 #define ECAL_PARTIAL
 
 #ifdef ECAL_PARTIAL
@@ -119,9 +110,7 @@ struct alignas(4) properties_t {
   uint16_t _cal_status;
 
   complexf _cal_data[CAL_ENTRIES][SWEEP_POINTS_MAX];
-  float _electrical_delay; // picoseconds
 
-  float _velocity_factor; // %
   uint8_t _avg;
   uint8_t _adf4350_txPower; // 0 to 3
   uint8_t _si5351_txPower; // 0 to 3
@@ -155,30 +144,15 @@ struct alignas(4) properties_t {
 
 typedef struct {
   uint32_t magic;
-  uint16_t dac_value; // unused
   uint32_t checksum;
 } config_t;
 
-
-
-#define CONFIG_MAGIC 0x80081235
-
+#define CONFIG_MAGIC 0x8008123c
 
 static inline bool is_freq_for_adf4350(freqHz_t freq) 
 {
 	return freq > FREQUENCY_CHANGE_OVER;
 }
-
-// convert vbat [mV] to battery indicator
-static inline uint8_t vbat2bati(int16_t vbat)
-{
-	if (vbat < 3200) return 0;
-	if (vbat < 3450) return 25;
-	if (vbat < 3700) return 50;
-	if (vbat < 4100) return 75;
-	return 100;
-}
-
 
 float my_atof(const char *p);
 

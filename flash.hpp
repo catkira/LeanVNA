@@ -31,8 +31,6 @@ static inline uint32_t SAVEAREA(int id) {
 	return SAVEAREA_BEGIN + id*SAVEAREA_BYTES;
 }
 
-
-
 uint32_t flash_program_data(uint32_t start_address, uint8_t *input_data, uint32_t num_elements);
 
 int flash_caldata_save(int id);
