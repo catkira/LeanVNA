@@ -66,7 +66,6 @@ namespace synthesizers {
 		adf4350.N = N / modulus;
 		adf4350.numerator = N - (adf4350.N * modulus);
 		adf4350.denominator = modulus;
-
 		adf4350.sendConfig();
 		adf4350.sendN();
 	}

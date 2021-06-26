@@ -46,7 +46,6 @@ inline complexf SOL_compute_reflection(complexf sc, complexf oc, complexf load, 
 	return -(a - d)*(b - c)/(a*(b - c) + 2.f*c*(a - b) + d*(-2.f*a + b + c));
 }
 
-
 // given the measured raw values for S,O,L and a DUT calibrated value, compute the outgoing power
 // gain caused by the SFG loop between the DUT and port 1.
 inline complexf SOL_compute_thru_gain(complexf sc, complexf oc, complexf load, complexf dut) {

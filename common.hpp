@@ -61,7 +61,6 @@ static constexpr uint32_t FREQUENCY_CHANGE_OVER	= 140000000;
 #define ECAL_CHANNELS 3
 #endif
 
-
 #define CAL_ENTRIES 7
 #define CAL_LOAD 0
 #define CAL_OPEN 1
