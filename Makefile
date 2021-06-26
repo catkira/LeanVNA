@@ -4,11 +4,14 @@ OPENCM3_DIR    ?= libopencm3
 BOOTLOAD_PORT       ?= /dev/ttyACM0
 
 # device config
-BOARDNAME		= board_v2_3
+BOARDNAME		?= board_v2_3
 DEVICE          = gd32f303cc_nofpu
 
+OBJS += $(BOARDNAME)/board.o \
+    gitversion.hpp \
+    main2.o \
+    $(NULL)
 
-OBJS			+= main2.o $(BOARDNAME)/board.o gitversion.hpp
 OBJS	+= \
 	$(MCULIB)/dma_adc.o \
 	$(MCULIB)/dma_driver.o \
@@ -24,7 +27,7 @@ CPPFLAGS		+= -Wall -Wno-unused-function -Werror=implicit-fallthrough
 #CPPFLAGS		+= -DDISPLAY_ST7796
 CPPFLAGS		+=  -ffunction-sections -fdata-sections
 #C++ only flags, CPP is used for both C++ and C files
-CXXFLAGS		+= -std=c++17 -fno-exceptions -fno-rtti
+CXXFLAGS		+= --std=c++17 -fno-exceptions -fno-rtti
 
 # safe g++ flags
 CPPFLAGS		+= -funsigned-char -fwrapv -fno-delete-null-pointer-checks -fno-strict-aliasing
