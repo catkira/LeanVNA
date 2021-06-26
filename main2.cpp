@@ -121,7 +121,7 @@ static small_function<void()> collectMeasurementCB;
 
 static void adc_process();
 static int measurementGetDefaultGain(freqHz_t freqHz);
-
+void cal_interpolate(void);
 
 #define myassert(x) if(!(x)) do { errorBlink(3); } while(1)
 
@@ -748,16 +748,12 @@ static void setVNASweepToUSB() {
 static void measurementPhaseChanged(VNAMeasurementPhases ph);
 
 static void cmdRegisterWrite(int address) {
-	if (address == 0x40) 
-	{
-		current_props._avg = (uint8_t) registers[0x40];
+	if(address == 0xee) {
 		return;
-	}
-	if (address == 0x42) 
-	{
-		current_props._adf4350_txPower = (uint8_t)registers[0x42]; 
-		return;
-	}
+	}	
+	if (address == 0x40) {UIActions::set_averaging(registers[0x40]); return;}
+	if (address == 0x42) {UIActions::set_adf4350_txPower(registers[0x42]); return;}
+
 	if(!usbDataMode)
 		enterUSBDataMode();	
 	if(address == 0x00 || address == 0x10 || address == 0x20 || address == 0x22) 
@@ -1091,6 +1087,18 @@ static void rawMeasurementEmitData()
 	rawAutoSwitch = false;
 }
 
+void updateAveraging() {
+	int avg = current_props._avg;
+	if(!usbDataMode && avg != currSweepArgs.dataPointsPerFreq) {
+		currSweepArgs.dataPointsPerFreq = avg;
+#if BOARD_REVISION >= 4
+		sys_syscall(3, &currSweepArgs);
+#else
+		vnaMeasurement.sweepDataPointsPerFreq = avg;
+		vnaMeasurement.resetSweep();
+#endif
+	}
+}
 
 static void measurement_setup() {
 	vnaMeasurement.phaseChanged = [](VNAMeasurementPhases ph) {
@@ -1182,25 +1190,6 @@ bool cpu_enable_fpu(void)
 		}
 	}
 	return true;
-}
-
-// nanovna UI callbacks
-namespace UIActions {
-	void rebuild_bbgain(void){
-#if BOARD_REVISION < 4
-		performGainCal(vnaMeasurement, gainTable, RFSW_BBGAIN_MAX);
-#else
-		sys_syscall(4, gainTable);
-#endif
-
-		for(int i=0; i<=RFSW_BBGAIN_MAX; i++) {
-			printk("BBGAIN %d: %.2f dB\n", i, log10f(gainTable[i])*20.f);
-		}
-	}
-
-	void cal_reset(void) {
-		current_props.setCalDataToDefault();
-	}	
 }
 
 int main(void) {
@@ -1378,3 +1367,322 @@ extern "C" {
 }
 
 
+// nanovna UI callbacks
+namespace UIActions {
+
+	void cal_collect(int type) {
+		current_props._cal_status &= ~(1 << type);
+		vnaMeasurement.measurement_mode = MEASURE_MODE_FULL;
+		collectMeasurementCB = [type]() {
+		#if BOARD_REVISION >= 4
+			sys_setTimings_args args {0, 1};
+			sys_syscall(5, &args);
+		#else
+			vnaMeasurement.ecalIntervalPoints = MEASUREMENT_ECAL_INTERVAL;
+			vnaMeasurement.nPeriodsMultiplier = current_props._avg;
+		#endif
+			current_props._cal_status |= (1 << type);
+			//ui_cal_collected();
+		};
+		uint32_t avgMult = 2;
+	#if BOARD_REVISION >= 4
+		__sync_synchronize();
+		sys_setTimings_args args {0, avgMult};
+		sys_syscall(5, &args);
+	#else
+		vnaMeasurement.ecalIntervalPoints = 1;
+		vnaMeasurement.nPeriodsMultiplier = avgMult;
+		vnaMeasurement.resetSweep();
+	#endif
+		collectMeasurementType = type;
+	}
+	void cal_done(void) {
+		current_props._cal_status |= CALSTAT_APPLY;
+		vnaMeasurement.measurement_mode = (enum MeasurementMode) current_props._measurement_mode;
+	}
+	void cal_reset(void) {
+		current_props.setCalDataToDefault();
+	}
+	void cal_reset_all(void) {
+		current_props.setFieldsToDefault();
+		setVNASweepToUI();
+//		force_set_markmap();
+	}
+
+	static inline void clampFrequency(freqHz_t& f) {
+		if(f < FREQUENCY_MIN)
+			f = FREQUENCY_MIN;
+		if(f > FREQUENCY_MAX)
+			f = FREQUENCY_MAX;
+	}
+
+	void freq_mode_startstop(void) {
+		if (frequency1 <= 0) {
+			auto start = frequency0 + frequency1/2;
+			auto stop = frequency0 - frequency1/2;
+			frequency0 = start;
+			frequency1 = stop;
+		}
+	}
+
+	void freq_mode_centerspan(void) {
+		if (frequency1 > 0) {
+			auto center = (frequency0 + frequency1) / 2;
+			auto span = frequency1 - frequency0;
+			frequency0 = center;
+			frequency1 = -span;
+		}
+	}
+
+	void set_sweep_frequency(SweepParameter type, freqHz_t frequency) {
+		switch(type) {
+			case ST_START:
+				clampFrequency(frequency);
+				freq_mode_startstop();
+				frequency0 = frequency;
+				if(frequency1 < frequency0) {
+					frequency1 = frequency0;
+				}
+				break;
+			case ST_STOP:
+				clampFrequency(frequency);
+				freq_mode_startstop();
+				frequency1 = frequency;
+				if(frequency1 < frequency0) {
+					frequency0 = frequency1;
+				}
+				break;
+			case ST_CENTER:
+			{
+				clampFrequency(frequency);
+				freq_mode_centerspan();
+				frequency0 = frequency;
+				auto center = frequency0;
+				auto span = -frequency1;
+				if (center-span/2 < FREQUENCY_MIN) {
+					span = (center - FREQUENCY_MIN) * 2;
+					frequency1 = -span;
+				}
+				if (center+span/2 > FREQUENCY_MAX) {
+					span = (FREQUENCY_MAX - center) * 2;
+					frequency1 = -span;
+				}
+				break;
+			}
+			case ST_SPAN:
+			{
+				freq_mode_centerspan();
+				if (frequency > FREQUENCY_MAX-FREQUENCY_MIN)
+					frequency = FREQUENCY_MAX-FREQUENCY_MIN;
+				if (frequency < 0)
+					frequency = 0;
+				frequency1 = -frequency;
+				auto center = frequency0;
+				auto span = -frequency1;
+				if (center-span/2 < FREQUENCY_MIN) {
+					center = FREQUENCY_MIN + span/2;
+					frequency0 = center;
+				}
+				if (center+span/2 > FREQUENCY_MAX) {
+					center = FREQUENCY_MAX - span/2;
+					frequency0 = center;
+				}
+
+				// If span is zero, assume CW mode
+				if (span == 0)
+					current_props._measurement_mode = MEASURE_MODE_REFL_THRU;
+
+				break;
+			}
+			case ST_CW:
+				clampFrequency(frequency);
+				frequency0 = frequency;
+				frequency1 = 0;
+				// True CW mode by not switching output RF switch
+				current_props._measurement_mode = MEASURE_MODE_REFL_THRU;
+				break;
+			default: return;
+		}
+		setVNASweepToUI();
+		cal_interpolate();
+	}
+	void set_sweep_points(int points) {
+		if(points < SWEEP_POINTS_MIN)
+			points = SWEEP_POINTS_MIN;
+		if(points > SWEEP_POINTS_MAX)
+			points = SWEEP_POINTS_MAX;
+		current_props._sweep_points = points;
+		setVNASweepToUI();
+		cal_interpolate();
+	}
+
+	void set_measurement_mode(enum MeasurementMode mode) {
+		current_props._measurement_mode = mode;
+		setVNASweepToUI();
+	}
+
+	freqHz_t get_sweep_frequency(int type) {
+		if(frequency1 > 0) {
+			switch (type) {
+			case ST_START: return frequency0;
+			case ST_STOP: return frequency1;
+			case ST_CENTER: return (frequency0 + frequency1)/2;
+			case ST_SPAN: return frequency1 - frequency0;
+			case ST_CW: return (frequency0 + frequency1)/2;
+			}
+		} else {
+			switch (type) {
+			case ST_START: return frequency0 + frequency1/2;
+			case ST_STOP: return frequency0 - frequency1/2;
+			case ST_CENTER: return frequency0;
+			case ST_SPAN: return -frequency1;
+			case ST_CW: return frequency0;
+			}
+		}
+		return 0;
+	}
+	freqHz_t frequencyAt(int index) {
+	#if BOARD_REVISION < 4
+		return vnaMeasurement.sweepStartHz + vnaMeasurement.sweepStepHz * index;
+	#else
+		return currSweepArgs.startFreqHz + currSweepArgs.stepFreqHz * index;
+	#endif
+	}
+
+	void toggle_sweep(void) {
+		sweep_enabled = !sweep_enabled;
+	}
+	void enable_refresh(bool enable) {
+		sweep_enabled = enable;
+	}
+
+
+
+	void set_trace_type(int t, int type) {
+		int polar = (type == TRC_SMITH || type == TRC_POLAR);
+		int enabled = type != TRC_OFF;
+		bool force = false;
+
+		if (trace[t].polar != polar) {
+			trace[t].polar = polar;
+			force = true;
+		}
+		if (trace[t].enabled != enabled) {
+			trace[t].enabled = enabled;
+			force = true;
+		}
+		if (trace[t].type != type) {
+			trace[t].type = type;
+			trace[t].refpos = trace_info[type].refpos;
+			if (polar)
+				force = true;
+		}
+		if (force) {
+			//plot_into_index(measured);
+			//force_set_markmap();
+		}
+	}
+	void set_trace_channel(int t, int channel)
+	{
+		if (trace[t].channel != channel) {
+			trace[t].channel = channel;
+			//force_set_markmap();
+		}
+	}
+
+	void set_trace_scale(int t, float scale)
+	{
+		scale /= trace_info[trace[t].type].scale_unit;
+		if (trace[t].scale != scale) {
+			trace[t].scale = scale;
+			//force_set_markmap();
+		}
+	}
+
+
+	void set_trace_refpos(int t, float refpos)
+	{
+		if (trace[t].refpos != refpos) {
+			trace[t].refpos = refpos;
+			//force_set_markmap();
+		}
+	}
+
+	void set_electrical_delay(float picoseconds)
+	{
+		if (electrical_delay != picoseconds) {
+			electrical_delay = picoseconds;
+			//force_set_markmap();
+		}
+	}
+
+	float get_electrical_delay(void)
+	{
+		return electrical_delay;
+	}
+
+	void set_averaging(int i) {
+		if(i < 1) i = 1;
+		if(i > 255) i = 255;
+		current_props._avg = (uint8_t) i;
+		registers[0x40] = (uint8_t) i;
+		updateAveraging();
+	}
+
+	void set_adf4350_txPower(int i) {
+		if(i < 0) i = 0;
+		if(i > 3) i = 3;
+		current_props._adf4350_txPower = (uint8_t) i;
+		registers[0x42] = (uint8_t) i;
+	}
+
+	int caldata_save(int id) {
+		ecalIgnoreValues = 1000000;
+		int ret = flash_caldata_save(id);
+		ecalIgnoreValues = 20;
+		return ret;
+	}
+
+	void rebuild_bbgain(void){
+#if BOARD_REVISION < 4
+		performGainCal(vnaMeasurement, gainTable, RFSW_BBGAIN_MAX);
+#else
+		sys_syscall(4, gainTable);
+#endif
+
+		for(int i=0; i<=RFSW_BBGAIN_MAX; i++) {
+			printk("BBGAIN %d: %.2f dB\n", i, log10f(gainTable[i])*20.f);
+		}
+	}
+
+	int caldata_recall(int id) {
+		int ret = flash_caldata_recall(id);
+		if(ret == 0) {
+			setVNASweepToUI();
+			//force_set_markmap();
+		}
+		return ret;
+	}
+
+	int config_save() {
+		ecalIgnoreValues = 1000000;
+		int ret = flash_config_save();
+		ecalIgnoreValues = 20;
+		return ret;
+	}
+	int config_recall() {
+		return flash_config_recall();
+	}
+
+	void enterBootload() {
+		// write magic value into ram (note: corrupts top of the stack)
+		bootloaderBootloadIndicator = BOOTLOADER_BOOTLOAD_MAGIC;
+		// soft reset
+		SCB_AIRCR = SCB_AIRCR_VECTKEY | SCB_AIRCR_SYSRESETREQ;
+		while(true);
+	}
+
+	void reconnectUSB() {
+		exitUSBDataMode();
+	}
+}

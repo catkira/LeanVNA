@@ -41,6 +41,7 @@ extern volatile EcalStates ecalState;
 #define cal_status current_props._cal_status
 #define frequencies current_props._frequencies
 #define cal_data current_props._cal_data
+#define electrical_delay current_props._electrical_delay
 
 #define trace current_props._trace
 #define domain_mode current_props._domain_mode

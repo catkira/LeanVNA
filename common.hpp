@@ -99,8 +99,25 @@ enum MeasurementMode {
     MEASURE_MODE_REFL_THRU_REFRENCE, //No ecal
 };
 
-constexpr uint32_t BOOTLOADER_DFU_MAGIC = 0xdeadbabe;
-static volatile uint32_t& bootloaderDFUIndicator = *(uint32_t*)(0x20000000 + 48*1024 - 4);
+constexpr uint32_t BOOTLOADER_BOOTLOAD_MAGIC = 0xdeadbabe;
+static volatile uint32_t& bootloaderBootloadIndicator = *(uint32_t*)(0x20000000 + 48*1024 - 4);
+
+enum {
+  TRC_LOGMAG, TRC_PHASE, TRC_DELAY, TRC_SMITH, TRC_POLAR, TRC_LINEAR, TRC_SWR, TRC_REAL, TRC_IMAG, TRC_R, TRC_X, TRC_Q, TRC_OFF
+};
+
+enum SweepParameter {
+  ST_START, ST_STOP, ST_CENTER, ST_SPAN, ST_CW
+};
+
+typedef struct {
+  uint8_t enabled;
+  uint8_t type;
+  uint8_t channel;
+  uint8_t polar;
+  float scale;
+  float refpos;
+} trace_t;
 
 struct alignas(4) properties_t {
   uint32_t magic;
@@ -110,7 +127,9 @@ struct alignas(4) properties_t {
   uint16_t _cal_status;
 
   complexf _cal_data[CAL_ENTRIES][SWEEP_POINTS_MAX];
+  float _electrical_delay; // picoseconds
 
+  trace_t _trace[TRACES_MAX];
   uint8_t _avg;
   uint8_t _adf4350_txPower; // 0 to 3
   uint8_t _si5351_txPower; // 0 to 3
@@ -154,3 +173,21 @@ static inline bool is_freq_for_adf4350(freqHz_t freq)
 	return freq > FREQUENCY_CHANGE_OVER;
 }
 
+static const struct {
+  const char *name;
+  uint16_t refpos;
+  float scale_unit;
+} trace_info[] = {
+  { "LOGMAG", 7, 10 },
+  { "PHASE",  4, 90 },
+  { "DELAY",  4,  1 },
+  { "SMITH",  0,  1 },
+  { "POLAR",  0,  1 },
+  { "LINEAR", 0,  0.125 },
+  { "SWR",    0,  1 },
+  { "REAL",   4,  0.25 },
+  { "IMAG",   4,  0.25 },
+  { "R",      0, 100 },
+  { "X",      4, 100 },
+  { "Q",      0, 10.0 }
+};
