@@ -189,5 +189,3 @@ static const struct {
   { "X",      4, 100 },
   { "Q",      0, 10.0 }
 };
-
-

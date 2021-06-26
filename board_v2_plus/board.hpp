@@ -66,7 +66,7 @@ namespace board {
 	static constexpr Pad RFSW_RXSYNTH = PA10;
 	static constexpr Pad RFSW_REFL = PA8;
 	static constexpr Pad RFSW_RECV = PA9;
-	
+
 	static constexpr Pad lcd_clk = PB3;
 	static constexpr Pad lcd_mosi = PB5;
 	static constexpr Pad lcd_miso = PB4;
@@ -136,7 +136,6 @@ namespace board {
 
 	constexpr int si5351_rxPLL = 0, si5351_txPLL = 1;
 	constexpr int si5351_rxPort = 0, si5351_txPort = 2, si5351_passthruPort = -1;
-
 
 
 	// rf switch positions
