@@ -18,7 +18,8 @@ static void discardPoints(FIFO<complexf, fifoSize>& dpFIFO, int n) {
 
 	// skip n data points
 	for(int i=0; i<n; i++) {
-		while(!dpFIFO.readable());
+		while(!dpFIFO.readable())
+		{};
 		dpFIFO.dequeue();
 	}
 }
