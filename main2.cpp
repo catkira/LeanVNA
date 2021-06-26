@@ -44,10 +44,6 @@
 #include "sin_rom.hpp"
 #include "gain_cal.hpp"
 
-#ifdef HAS_SELF_TEST
-#include "self_test.hpp"
-#endif
-
 #include <libopencm3/stm32/timer.h>
 #include <libopencm3/cm3/scb.h>
 #include <libopencm3/cm3/vector.h>
