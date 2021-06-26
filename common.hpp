@@ -232,32 +232,11 @@ struct alignas(4) properties_t {
   void do_cal_reset(int calType, complexf val);
 };
 
-
 typedef struct {
   uint32_t magic;
   uint16_t dac_value; // unused
-  uint16_t grid_color;
-  uint16_t menu_normal_color;
-  uint16_t menu_active_color;
-  uint16_t trace_color[TRACES_MAX];
-  int16_t touch_cal[4];
-  int8_t default_loadcal;
-  uint32_t harmonic_freq_threshold; // unused
-  int8_t ui_options;
   uint32_t checksum;
 } config_t;
-
-struct uistat_t {
-  int8_t digit; /* 0~5 */
-  int8_t digit_mode;
-  int8_t current_trace; /* 0..3 */
-  int64_t value; // for editing at numeric input area
-  uint8_t lever_mode;
-  int8_t previous_marker;
-  MarkerSearchModes marker_search_mode;
-  bool marker_tracking;
-  bool marker_delta;
-};
 
 #define CONFIG_MAGIC 0x8008123c
 

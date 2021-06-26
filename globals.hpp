@@ -43,8 +43,6 @@ enum EcalStates {
 };
 extern volatile EcalStates ecalState;
 
-extern uistat_t uistat;
-
 #define frequency0 current_props._frequency0
 #define frequency1 current_props._frequency1
 #define sweep_points current_props._sweep_points

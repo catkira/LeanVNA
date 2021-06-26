@@ -11,7 +11,9 @@ enum class VNAMeasurementPhases {
 
 	ECALLOAD,
 	ECALSHORT,
-	ECALTHRU
+	ECALTHRU,
+
+	IDLE
 };
 
 // implements sweep, rf switch timing, and dsp for single-receiver

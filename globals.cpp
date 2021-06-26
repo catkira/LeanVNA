@@ -10,10 +10,6 @@ int16_t lastsaveid = 0;
 
 config_t config = {
   .magic =             CONFIG_MAGIC,
-  .dac_value =         1922,
-  .default_loadcal =   0,
-  .harmonic_freq_threshold = 300000000,
-  .ui_options =        0,
   .checksum =          0
 };
 
@@ -32,16 +28,4 @@ __attribute__((used))
 volatile int MEASUREMENT_ECAL_INTERVAL = BOARD_MEASUREMENT_ECAL_INTERVAL;
 __attribute__((used))
 volatile int MEASUREMENT_NWAIT_SWITCH = BOARD_MEASUREMENT_NWAIT_SWITCH;
-
-uistat_t uistat = {
- digit: 6,
- digit_mode: 0,
- current_trace: 0,
- value: 0,
- lever_mode: LM_MARKER,
- previous_marker: 0,
- marker_search_mode: MarkerSearchModes::Max,
- marker_tracking: false,
- marker_delta: false
-};
 

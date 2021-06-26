@@ -1803,13 +1803,6 @@ namespace UIActions {
 		return flash_config_recall();
 	}
 
-	void printTouchCal() {
-		printk1("touch cal:\n");
-		printk("    %d, %d\n    %d, %d\n",
-				(int)config.touch_cal[0], (int)config.touch_cal[1],
-				(int)config.touch_cal[2], (int)config.touch_cal[3]);
-	}
-
 	void enterBootload() {
 		// finish screen updates
 		lcd_spi_waitDMA();
