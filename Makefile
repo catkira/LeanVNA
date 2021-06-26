@@ -37,6 +37,7 @@ LDFLAGS			+= -Wl,--gc-sections
 LDLIBS          += -Wl,--start-group -lgcc -lnosys -Wl,--end-group -lm
 
 GITVERSION		= "$(shell git log -n 1 --pretty=format:"git-%ad%h" --date=format:"%Y%m%d-")"
+GITURL          = "$(shell git config --get remote.origin.url)"
 
 LIBNAME         = opencm3_$(genlink_family)
 OPENCM3_LIB     = $(OPENCM3_DIR)/lib/lib$(LIBNAME).a

@@ -69,7 +69,7 @@ using namespace board;
 void* __dso_handle = (void*) &__dso_handle;
 
 static bool outputRawSamples = false;
-static volatile bool rawAutoSwitch = false;
+//static volatile bool rawAutoSwitch = false;
 int cpu_mhz = 8; /* The CPU boots on internal (HSI) 8Mhz */
 
 
@@ -88,8 +88,7 @@ static CommandParser cmdParser;
 static StreamFIFO cmdInputFIFO;
 static uint8_t cmdInputBuffer[128];
 
-
-static float gainTable[RFSW_BBGAIN_MAX+1];
+float gainTable[RFSW_BBGAIN_MAX+1];
 
 __attribute__((packed))
 struct usbDataPoint {
@@ -773,7 +772,7 @@ static void setVNASweepToUSB() {
 #endif	
 }
 
-static void measurementPhaseChanged(VNAMeasurementPhases ph);
+//static void measurementPhaseChanged(VNAMeasurementPhases ph);
 
 static void cmdRegisterWrite(int address) {
 	if(address == 0xee) {
@@ -789,7 +788,7 @@ static void cmdRegisterWrite(int address) {
 	if(address == 0x00)
 	{
 		//freqHz_t f = (freqHz_t)*(uint64_t*)(registers + 0x00);
-		setFrequency((freqHz_t)*(uint64_t*)(registers + 0x00));
+		//setFrequency((freqHz_t)*(uint64_t*)(registers + 0x00));
 	}
 	if(address == 0x26) 
 	{
@@ -1115,10 +1114,10 @@ static void measurementEmitDataPoint(int freqIndex, freqHz_t freqHz, VNAObservat
 	}
 }
 
-static void rawMeasurementEmitData()
-{
-	rawAutoSwitch = false;
-}
+// static void rawMeasurementEmitData()
+// {
+// 	rawAutoSwitch = false;
+// }
 
 void updateAveraging() {
 	int avg = current_props._avg;
@@ -1354,14 +1353,8 @@ int main(void) {
 		//show_dmesg();
 	}
 	UIActions::rebuild_bbgain();
-	
+
 	usbTxQueueRPos = usbTxQueueWPos;
-
-	performGainCal(vnaMeasurement, gainTable, RFSW_BBGAIN_MAX);
-
-	for(int i=0; i<=RFSW_BBGAIN_MAX; i++) {
-		printk("BBGAIN %d: %.2f dB\n", i, log10f(gainTable[i])*20.f);
-	}
 
 	setVNASweepToUI();
 	usbDataMode=true;
