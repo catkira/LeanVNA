@@ -254,11 +254,6 @@ extern "C" void tim1_up_isr() {
 }
 
 static int si5351_doUpdate(uint32_t freqHz) {
-	// round frequency to values that can be accurately set, so that IF frequency is not wrong
-//	if(freqHz <= 10000000)
-//		freqHz = (freqHz/10) * 10;
-//	else
-//		freqHz = (freqHz/100) * 100;
 	return synthesizers::si5351_set(freqHz+lo_freq, freqHz);
 }
 
@@ -797,6 +792,7 @@ static int measurementGetDefaultGain(freqHz_t freqHz) {
 	else
 		return 0;
 }
+
 // callback called by VNAMeasurement to change rf switch positions.
 static void measurementPhaseChanged(VNAMeasurementPhases ph) {
 	switch(ph) {
@@ -837,6 +833,8 @@ static void measurementPhaseChanged(VNAMeasurementPhases ph) {
 			rfsw(RFSW_ECAL, RFSW_ECAL_SHORT);
 			rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(measurementGetDefaultGain(currFreqHz)));
 			break;
+        case IDLE:
+            break;
 	}
 }
 
