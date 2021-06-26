@@ -84,7 +84,6 @@ float gainTable[RFSW_BBGAIN_MAX+1];
 
 __attribute__((packed))
 struct usbDataPoint {
-	//VNAObservation value;
 	complexf S11, S21;
 	int freqIndex;
 };
@@ -96,17 +95,7 @@ static volatile int usbTxQueueRPos = 0;
 // periods of a 1MHz clock; how often to call adc_process()
 static constexpr int tim1Period = 25;	// 1MHz / 25 = 40kHz
 
-// periods of a 1MHz clock; how often to call UIHW::checkButtons
-static constexpr int tim2Period = 50000;	// 1MHz / 50000 = 20Hz
-
-
-// value is in microseconds; increments at 40kHz by TIM1 interrupt
-volatile uint32_t systemTimeCounter = 0;
-
-static FIFO<small_function<void()>, 8> eventQueue;
-
 static volatile bool usbDataMode = false;
-static volatile bool usbCaptureMode = false;
 
 static freqHz_t currFreqHz = 0;		// current hardware tx frequency
 
@@ -245,14 +234,6 @@ static void startTimer(uint32_t timerDevice, int period) {
 	timer_set_counter(timerDevice, 0);
 	timer_enable_counter(timerDevice);
 }
-static void ui_timer_setup() {
-	rcc_periph_clock_enable(RCC_TIM2);
-	rcc_periph_reset_pulse(RST_TIM2);
-	nvic_set_priority(NVIC_TIM2_IRQ, 0x80);
-	nvic_enable_irq(NVIC_TIM2_IRQ);
-	startTimer(TIM2, tim2Period);
-}
-
 
 static void dsp_timer_setup() {
 	rcc_periph_clock_enable(RCC_TIM1);
@@ -265,7 +246,6 @@ static void dsp_timer_setup() {
 
 extern "C" void tim1_up_isr() {
 	TIM1_SR = 0;
-	systemTimeCounter += tim1Period;
 	adc_process();
 }
 
@@ -1000,7 +980,6 @@ static void measurementEmitDataPoint(int freqIndex, freqHz_t freqHz, VNAObservat
 //			}
 #endif
 			collectMeasurementType = -1;
-			eventQueue.enqueue(collectMeasurementCB);
 		}
 	}
 	// enqueue new data point
@@ -1127,28 +1106,6 @@ static void usb_transmit_rawSamples() {
 	rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(0));
 }
 
-static float bessel0(float x) {
-	const float eps = 0.0001;
-
-	float ret = 0;
-	float term = 1;
-	float m = 0;
-
-	while (term  > eps * ret) {
-		ret += term;
-		++m;
-		term *= (x*x) / (4*m*m);
-	}
-
-	return ret;
-}
-
-static float kaiser_window(float k, float n, float beta) {
-	if (beta == 0.0) return 1.0;
-	float r = (2 * k) / (n - 1) - 1;
-	return bessel0(beta * sqrt(1 - r * r)) / bessel0(beta);
-}
-
 static void apply_edelay(int i, complexf& refl, complexf& thru) {
 	if (electrical_delay == 0.0) return;
 	float w = 2 * M_PI * electrical_delay * UIActions::frequencyAt(i) * 1E-12;
@@ -1157,8 +1114,7 @@ static void apply_edelay(int i, complexf& refl, complexf& thru) {
 	thru *= s;
 }
 
-void
-cal_interpolate(void)
+void cal_interpolate(void)
 {
   const properties_t *src = caldata_reference();
   properties_t *dst = &current_props;
@@ -1876,15 +1832,5 @@ namespace UIActions {
 
 	void reconnectUSB() {
 		exitUSBDataMode();
-	}
-
-	void application_doEvents() {
-		while(eventQueue.readable()) {
-			auto callback = eventQueue.read();
-			eventQueue.dequeue();
-			if(!callback)
-				abort();
-			callback();
-		}
 	}
 }
