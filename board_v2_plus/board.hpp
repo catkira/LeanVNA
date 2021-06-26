@@ -66,7 +66,6 @@ namespace board {
 	static constexpr Pad RFSW_RXSYNTH = PA10;
 	static constexpr Pad RFSW_REFL = PA8;
 	static constexpr Pad RFSW_RECV = PA9;
-
 	
 	static constexpr Pad lcd_clk = PB3;
 	static constexpr Pad lcd_mosi = PB5;

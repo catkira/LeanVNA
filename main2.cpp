@@ -1075,9 +1075,6 @@ void adc_process() {
 		}
 	}
 }
-void insertSamples(int32_t valRe, int32_t valIm, bool c) {
-	vnaMeasurement.sampleProcessor_emitValue(valRe, valIm, c);
-}
 
 static int cnt = 0;
 static void usb_transmit_rawSamples() {
@@ -1482,7 +1479,7 @@ extern "C" {
 	}
 	uint8_t crashDiagBuf[128] alignas(8);
 	__attribute__((section(".start"), used))
-	const void* keepFunctions[] = {(void*)BOARD_REVISION_MAGIC, (void*)insertSamples,
+	const void* keepFunctions[] = {(void*)BOARD_REVISION_MAGIC,
 		(void*)&vnaMeasurement.sampleProcessor, (void*) adc_read,
 		(void*)calculateSynthWait, (void*)&MEASUREMENT_NPERIODS_NORMAL,
 		(void*)&MEASUREMENT_NPERIODS_CALIBRATING, (void*)&MEASUREMENT_ECAL_INTERVAL,
