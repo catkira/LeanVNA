@@ -84,8 +84,7 @@ static volatile uint16_t adcBuffer[adcBufSize];
 
 static VNAMeasurement vnaMeasurement;
 //static FIFO<uint16_t,8192> ADCValueQueue;
-static FIFO<uint16_t,1024> ADCValueQueue;
-static RawVNAMeasurement<decltype(ADCValueQueue)> rawVnaMeasurement;
+//static RawVNAMeasurement<decltype(ADCValueQueue)> rawVnaMeasurement;
 static CommandParser cmdParser;
 static StreamFIFO cmdInputFIFO;
 static uint8_t cmdInputBuffer[128];
@@ -608,28 +607,28 @@ For a description of the command interface see command_parser.hpp
 
 static void cmdReadRawFifo(const uint16_t nValues)
 {
-	const int txBufSize=0x3f;
-	volatile uint8_t txbuf[txBufSize];
-	volatile uint32_t valuesLeft = nValues;
-	while(valuesLeft > 0)
-	{
-		volatile int i=0;
-		while(i<(txBufSize-1) && valuesLeft) 
-		{
-			if(!ADCValueQueue.readable())  // queue empty
-				continue;
-			if(!rawVnaMeasurement.started()) // prevent reading old data before the new collection process has started
-				continue;
-			__sync_synchronize();
-			volatile uint16_t temp = ADCValueQueue.dequeue();
-			txbuf[i++]=uint8_t(temp>>0);
-			txbuf[i++]=uint8_t(temp>>8);
-			valuesLeft--;
-		}
-		if(!serialSendTimeout((char*)txbuf, i, 1500)) // max number of bytes seems to be 0x3f
-			return;
-	}
-	return;	
+	// const int txBufSize=0x3f;
+	// volatile uint8_t txbuf[txBufSize];
+	// volatile uint32_t valuesLeft = nValues;
+	// while(valuesLeft > 0)
+	// {
+	// 	volatile int i=0;
+	// 	while(i<(txBufSize-1) && valuesLeft) 
+	// 	{
+	// 		if(!ADCValueQueue.readable())  // queue empty
+	// 			continue;
+	// 		if(!rawVnaMeasurement.started()) // prevent reading old data before the new collection process has started
+	// 			continue;
+	// 		__sync_synchronize();
+	// 		volatile uint16_t temp = ADCValueQueue.dequeue();
+	// 		txbuf[i++]=uint8_t(temp>>0);
+	// 		txbuf[i++]=uint8_t(temp>>8);
+	// 		valuesLeft--;
+	// 	}
+	// 	if(!serialSendTimeout((char*)txbuf, i, 1500)) // max number of bytes seems to be 0x3f
+	// 		return;
+	// }
+	// return;	
 }
 
 static void cmdReadFIFO(int address, int nValues) 
@@ -816,7 +815,7 @@ static void cmdRegisterWrite(int address) {
 		vnaMeasurement.nPeriods = MEASUREMENT_NPERIODS_CALIBRATING;
 	}
 	if(address == 0x30) {
-		ADCValueQueue.clear();
+		//ADCValueQueue.clear();
 		usbTxQueueRPos = usbTxQueueWPos; // clear usbTxQueue
 	}
 	// if(address == 0x31) 
