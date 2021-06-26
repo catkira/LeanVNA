@@ -12,7 +12,7 @@ namespace synthesizers {
 	// returns 1 if two output dividers changed;
 	// returns 2 if pll updated.
 	int si5351_set(uint32_t rxFreqHz, uint32_t txFreqHz);
-	
+
 	// Find better approximate values for n/d
 	#define MAX_DENOMINATOR ((1 << 20) - 1)
 	static void approximate_fraction(uint32_t *n, uint32_t *d)
