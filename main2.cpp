@@ -1000,10 +1000,10 @@ static void measurementEmitDataPoint(int freqIndex, freqHz_t freqHz, VNAObservat
 
 // apply user-entered (on device) sweep parameters
 static void setVNASweepToUI() {
-	freqHz_t start = UIActions::get_sweep_frequency(ST_START);
-	freqHz_t stop = UIActions::get_sweep_frequency(ST_STOP);
-	start = 100000000;
-	stop =  300000000;	
+	//freqHz_t start = UIActions::get_sweep_frequency(ST_START);
+	//freqHz_t stop = UIActions::get_sweep_frequency(ST_STOP);
+	freqHz_t start = 100000000;
+	freqHz_t stop =  300000000;	
 	freqHz_t step = 0;
 	if(current_props._sweep_points > 0)
 		step = (stop - start) / (current_props._sweep_points - 1);
