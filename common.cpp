@@ -12,10 +12,6 @@ static const trace_t def_trace[TRACES_MAX] = {//enable, type, channel, reserved,
     { 1, TRC_PHASE,  0, 0, 1.0, 4.0 }
 };
 
-static const marker_t def_markers[MARKERS_MAX] = {
-  { 1, 30, 0 }, { 0, 40, 0 }, { 0, 60, 0 }, { 0, 80, 0 }
-};
-
 void properties_t::setFieldsToDefault() {
 	magic = CONFIG_MAGIC;
 	_frequency0   = 100000000;    // start = 100MHz
@@ -30,7 +26,6 @@ void properties_t::setFieldsToDefault() {
 
 	setCalDataToDefault();
 	memcpy(_trace, def_trace, sizeof(_trace));
-	memcpy(_markers, def_markers, sizeof(_markers));  
 }
 
 void properties_t::setCalDataToDefault() {
