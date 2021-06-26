@@ -170,8 +170,6 @@ struct alignas(4) properties_t {
   float _electrical_delay; // picoseconds
 
   trace_t _trace[TRACES_MAX];
-  float _velocity_factor; // %
-  uint8_t _domain_mode; /* 0bxxxxxffm : where ff: TD_FUNC m: DOMAIN_MODE */
   uint8_t _avg;
   uint8_t _adf4350_txPower; // 0 to 3
   uint8_t _si5351_txPower; // 0 to 3
@@ -216,18 +214,6 @@ static inline bool is_freq_for_adf4350(freqHz_t freq)
 {
 	return freq > FREQUENCY_CHANGE_OVER;
 }
-
-// convert vbat [mV] to battery indicator
-static inline uint8_t vbat2bati(int16_t vbat)
-{
-	if (vbat < 3200) return 0;
-	if (vbat < 3450) return 25;
-	if (vbat < 3700) return 50;
-	if (vbat < 4100) return 75;
-	return 100;
-}
-
-
 
 static const struct {
   const char *name;

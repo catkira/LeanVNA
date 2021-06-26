@@ -43,28 +43,9 @@ extern volatile EcalStates ecalState;
 #define electrical_delay current_props._electrical_delay
 
 #define trace current_props._trace
-#define markers current_props._markers
-#define active_marker current_props._active_marker
-#define domain_mode current_props._domain_mode
-#define velocity_factor current_props._velocity_factor
 #define marker_smith_format current_props._marker_smith_format
 
 extern volatile int MEASUREMENT_NPERIODS_NORMAL;
 extern volatile int MEASUREMENT_NPERIODS_CALIBRATING;
 extern volatile int MEASUREMENT_ECAL_INTERVAL;
 extern volatile int MEASUREMENT_NWAIT_SWITCH;
-
-static inline float get_trace_refpos(int t) {
-  return trace[t].refpos;
-}
-
-
-static inline float get_trace_scale(int t) {
-  return trace[t].scale * trace_info[trace[t].type].scale_unit;
-}
-
-static inline const char* get_trace_typename(int t) {
-  return trace_info[trace[t].type].name;
-}
-
-
