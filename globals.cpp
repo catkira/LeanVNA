@@ -2,7 +2,6 @@
 #include <board.hpp>
 
 volatile bool sweep_enabled = true;
-int16_t vbat;
 
 uint8_t registers[registerSize];
 

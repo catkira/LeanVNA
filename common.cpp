@@ -12,9 +12,6 @@ static const trace_t def_trace[TRACES_MAX] = {//enable, type, channel, reserved,
     { 1, TRC_PHASE,  0, 0, 1.0, 4.0 }
 };
 
-static const marker_t def_markers[MARKERS_MAX] = {
-  { 1, 30, 0 }, { 0, 40, 0 }, { 0, 60, 0 }, { 0, 80, 0 }
-};
 
 void properties_t::setFieldsToDefault() {
 	magic = CONFIG_MAGIC;
@@ -24,9 +21,7 @@ void properties_t::setFieldsToDefault() {
 	_cal_status   = 0;
 	_electrical_delay = 0.0;
 	_velocity_factor =  0.7;
-	_active_marker   = 0;
 	_domain_mode     = 0;
-	_marker_smith_format = MS_RLC;
 	_avg = 1;
 	_adf4350_txPower = 3;
 	_si5351_txPower = 1;
@@ -34,7 +29,6 @@ void properties_t::setFieldsToDefault() {
 
 	setCalDataToDefault();
 	memcpy(_trace, def_trace, sizeof(_trace));
-	memcpy(_markers, def_markers, sizeof(_markers));
 }
 
 void properties_t::setCalDataToDefault() {

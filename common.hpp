@@ -55,7 +55,6 @@ static constexpr uint32_t FREQUENCY_CHANGE_OVER	= 140000000;
 #endif
 
 #define TRACES_MAX 4
-#define MARKERS_MAX 4
 
 // Set FFT size depend from max points count
 #if SWEEP_POINTS_MAX < 256
@@ -134,11 +133,6 @@ enum MeasurementMode {
 constexpr uint32_t BOOTLOADER_BOOTLOAD_MAGIC = 0xdeadbabe;
 static volatile uint32_t& bootloaderBootloadIndicator = *(uint32_t*)(0x20000000 + 48*1024 - 4);
 
-
-
-
-// TODO: name all enums and refer to them by name
-
 enum {
   TRC_LOGMAG, TRC_PHASE, TRC_DELAY, TRC_SMITH, TRC_POLAR, TRC_LINEAR, TRC_SWR, TRC_REAL, TRC_IMAG, TRC_R, TRC_X, TRC_Q, TRC_OFF
 };
@@ -147,20 +141,6 @@ enum SweepParameter {
   ST_START, ST_STOP, ST_CENTER, ST_SPAN, ST_CW
 };
 
-// lever_mode
-enum {
-  LM_MARKER, LM_SEARCH, LM_CENTER, LM_SPAN
-};
-
-// marker smith value format
-enum {
-  MS_LIN, MS_LOG, MS_REIM, MS_RX, MS_RLC
-};
-
-enum MarkerSearchModes: uint8_t {
-	Min,
-	Max
-};
 
 #define MK_SEARCH_LEFT    -1
 #define MK_SEARCH_RIGHT    1
@@ -179,12 +159,6 @@ typedef struct {
   float refpos;
 } trace_t;
 
-typedef struct {
-  int8_t enabled;
-  int16_t index;
-  freqHz_t frequency;
-} marker_t;
-
 struct alignas(4) properties_t {
   uint32_t magic;
   freqHz_t _frequency0; // start
@@ -196,11 +170,8 @@ struct alignas(4) properties_t {
   float _electrical_delay; // picoseconds
 
   trace_t _trace[TRACES_MAX];
-  marker_t _markers[MARKERS_MAX];
   float _velocity_factor; // %
-  int _active_marker;
   uint8_t _domain_mode; /* 0bxxxxxffm : where ff: TD_FUNC m: DOMAIN_MODE */
-  uint8_t _marker_smith_format;
   uint8_t _avg;
   uint8_t _adf4350_txPower; // 0 to 3
   uint8_t _si5351_txPower; // 0 to 3

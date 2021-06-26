@@ -1,7 +1,6 @@
 #pragma once
 #include <stdint.h>
 #include "common.hpp"
-#include "board.hpp"
 
 // global variables, to be defined in globals.cpp that can be accessed by all modules.
 // DO NOT ADD STATEFUL FUNCTIONS HERE.
@@ -15,18 +14,10 @@ constexpr int registerSize = 256;
 constexpr int registersSizeMask = registerSize - 1;
 extern uint8_t registers[registerSize];
 
-extern uint16_t redraw_request;
 extern volatile bool sweep_enabled;
-
-
-extern int16_t vbat;
 
 extern int16_t lastsaveid;
 extern properties_t current_props;
-
-#define MARKER_INVALID     -1
-extern int8_t previous_marker;
-
 
 extern config_t config;
 
