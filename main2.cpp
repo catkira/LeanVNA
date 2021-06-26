@@ -833,7 +833,7 @@ static void measurementPhaseChanged(VNAMeasurementPhases ph) {
 			rfsw(RFSW_ECAL, RFSW_ECAL_SHORT);
 			rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(measurementGetDefaultGain(currFreqHz)));
 			break;
-        case IDLE:
+        case VNAMeasurementPhases::IDLE:
             break;
 	}
 }
