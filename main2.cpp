@@ -76,9 +76,6 @@ static VNAMeasurement vnaMeasurement;
 static CommandParser cmdParser;
 static StreamFIFO cmdInputFIFO;
 static uint8_t cmdInputBuffer[128];
-/* This is written in the 'measurement thread' (ADC ISR)
- * But read by the 'main thread'. So make it volatile */
-static volatile bool lcdInhibit = false;
 
 float gainTable[RFSW_BBGAIN_MAX+1];
 
@@ -690,6 +687,33 @@ static void cmdReadFIFO(int address, int nValues) {
 	}
 }
 
+// apply user-entered (on device) sweep parameters
+static void setVNASweepToUI() {
+	//freqHz_t start = UIActions::get_sweep_frequency(ST_START);
+	//freqHz_t stop = UIActions::get_sweep_frequency(ST_STOP);
+	freqHz_t start = 100000000;
+	freqHz_t stop =  300000000;	
+	freqHz_t step = 0;
+	if(current_props._sweep_points > 0)
+		step = (stop - start) / (current_props._sweep_points - 1);
+
+	// Default to full, after ecalState is done we goto the configured mode
+#if BOARD_REVISION < 4
+	ecalState = ECAL_STATE_MEASURING;
+	vnaMeasurement.measurement_mode = MEASURE_MODE_FULL;
+	vnaMeasurement.ecalIntervalPoints = 1;
+	vnaMeasurement.nPeriods = MEASUREMENT_NPERIODS_CALIBRATING;
+	vnaMeasurement.setSweep(start, step, current_props._sweep_points, current_props._avg);
+	ecalState = ECAL_STATE_MEASURING;
+#else
+	currTimingsArgs.nAverage = 1;
+	sys_syscall(5, &currTimingsArgs);
+	setHWSweep(sys_setSweep_args {
+		start, step, current_props._sweep_points, current_props._avg
+	});
+#endif
+}
+
 // apply usb-configured sweep parameters
 static void setVNASweepToUSB() {
 	int points = *(uint16_t*)(registers + 0x20);
@@ -785,7 +809,6 @@ static int measurementGetDefaultGain(freqHz_t freqHz) {
 }
 // callback called by VNAMeasurement to change rf switch positions.
 static void measurementPhaseChanged(VNAMeasurementPhases ph) {
-	lcdInhibit = false;
 	switch(ph) {
 		case VNAMeasurementPhases::REFERENCE:
 			rfsw(RFSW_REFL, RFSW_REFL_ON);
@@ -808,13 +831,11 @@ static void measurementPhaseChanged(VNAMeasurementPhases ph) {
 			rfsw(RFSW_REFL, RFSW_REFL_OFF);
 			rfsw(RFSW_RECV, RFSW_RECV_PORT2);
 			rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(vnaMeasurement.currThruGain));
-			lcdInhibit = true;
 			break;
 		case VNAMeasurementPhases::ECALTHRU:
 			rfsw(RFSW_ECAL, RFSW_ECAL_LOAD);
 			rfsw(RFSW_RECV, RFSW_RECV_REFL);
 			rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(measurementGetDefaultGain(currFreqHz)));
-			lcdInhibit = true;
 			break;
 		case VNAMeasurementPhases::ECALLOAD:
 			rfsw(RFSW_REFL, RFSW_REFL_ON);
@@ -996,34 +1017,6 @@ static void measurementEmitDataPoint(int freqIndex, freqHz_t freqHz, VNAObservat
 		__sync_synchronize();
 		usbTxQueueWPos = (wrWPos + 1) & usbTxQueueMask;
 	}
-}
-
-// apply user-entered (on device) sweep parameters
-static void setVNASweepToUI() {
-	//freqHz_t start = UIActions::get_sweep_frequency(ST_START);
-	//freqHz_t stop = UIActions::get_sweep_frequency(ST_STOP);
-	freqHz_t start = 100000000;
-	freqHz_t stop =  300000000;	
-	freqHz_t step = 0;
-	if(current_props._sweep_points > 0)
-		step = (stop - start) / (current_props._sweep_points - 1);
-
-	// Default to full, after ecalState is done we goto the configured mode
-#if BOARD_REVISION < 4
-	ecalState = ECAL_STATE_MEASURING;
-	vnaMeasurement.measurement_mode = MEASURE_MODE_FULL;
-	vnaMeasurement.ecalIntervalPoints = 1;
-	vnaMeasurement.nPeriods = MEASUREMENT_NPERIODS_CALIBRATING;
-	vnaMeasurement.setSweep(start, step, current_props._sweep_points, current_props._avg);
-	ecalState = ECAL_STATE_MEASURING;
-#else
-	currTimingsArgs.nAverage = 1;
-	sys_syscall(5, &currTimingsArgs);
-	setHWSweep(sys_setSweep_args {
-		start, step, current_props._sweep_points, current_props._avg
-	});
-#endif
-	//update_grid();
 }
 
 void updateAveraging() {
