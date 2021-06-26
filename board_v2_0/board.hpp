@@ -46,10 +46,6 @@ namespace board {
 	static constexpr Pad lcd_clk = PB3;
 	static constexpr Pad lcd_mosi = PB5;
 	static constexpr Pad lcd_miso = PB4;
-	static constexpr Pad ili9341_cs = PA15;
-	static constexpr Pad ili9341_dc = PB6;
-	static constexpr Pad xpt2046_cs = PB7;
-	static constexpr Pad xpt2046_irq = PB8;
 
 	static constexpr Pad LEVER_LEFT = PB14;
 	static constexpr Pad LEVER_CENTER = PB15;
@@ -110,11 +106,6 @@ namespace board {
 	constexpr int si5351_rxPLL = 0, si5351_txPLL = 1;
 	constexpr int si5351_rxPort = 0, si5351_txPort = 2, si5351_passthruPort = 1;
 
-
-	// lcd display
-
-	extern XPT2046 xpt2046;
-
 	// rf switch positions
 
 	static constexpr auto RFSW_ECAL_SHORT = RFSWState::RF2;
@@ -159,20 +150,4 @@ namespace board {
 
 	// set si5351 frequency for tx or rx port
 	void si5351_set(bool isRX, uint32_t freq_khz);
-
-	// sets up hardware spi for ili9341 and touch.
-	// spi peripheral only manages clk, sdi, and sdo.
-	void lcd_spi_init();
-
-	// two speed presets for ili9341 and touch controller
-	void lcd_spi_fast();
-	void lcd_spi_slow();
-
-	// bits must be 16 or 8
-	uint32_t lcd_spi_transfer(uint32_t sdi, int bits);
-
-	void lcd_spi_transfer_bulk(uint8_t* buf, int bytes);
-	
-	// wait for all bulk transfers to complete
-	void lcd_spi_waitDMA();
 }
