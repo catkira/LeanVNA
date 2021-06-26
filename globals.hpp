@@ -27,7 +27,6 @@ extern complexf measuredFreqDomain[2][SWEEP_POINTS_MAX];
 // measured data, possibly transformed
 extern complexf measured[2][SWEEP_POINTS_MAX];
 
-
 enum EcalStates {
 	ECAL_STATE_MEASURING,
 	ECAL_STATE_2NDSWEEP,

@@ -49,7 +49,7 @@ void CommandParser::handleInput(const uint8_t* s, int len) {
 						break;
 					case 0x13:
 						send(rPtr, 8);
-						break;						
+						break;	
 				}
 				cmdPhase = 0;
 				goto cont;
@@ -61,7 +61,7 @@ void CommandParser::handleInput(const uint8_t* s, int len) {
 		// 2 or more parameter commands
 		switch(cmdOpcode) {
 			case 0x18:
-			case 0x13: // FOR TEMPORARY BACKWARDS COMPATIBILITY ONLY. WILL BE REMOVED.			
+			case 0x13: // FOR TEMPORARY BACKWARDS COMPATIBILITY ONLY. WILL BE REMOVED.
 				handleReadFIFO(cmdAddress, c);
 				cmdPhase = 0;
 				break;
