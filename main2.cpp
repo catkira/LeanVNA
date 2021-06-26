@@ -34,9 +34,6 @@
 #include <board.hpp>
 #include "ili9341.hpp"
 #include "plot.hpp"
-#include "uihw.hpp"
-#include "ui.hpp"
-#include "uihw.hpp"
 #include "common.hpp"
 #include "globals.hpp"
 #include "synthesizers.hpp"
@@ -274,10 +271,6 @@ extern "C" void tim1_up_isr() {
 	systemTimeCounter += tim1Period;
 	adc_process();
 }
-extern "C" void tim2_isr() {
-	TIM2_SR = 0;
-	UIHW::checkButtons();
-}
 
 static int si5351_doUpdate(uint32_t freqHz) {
 	// round frequency to values that can be accurately set, so that IF frequency is not wrong
@@ -462,102 +455,6 @@ void adc_read(volatile uint16_t*& data, int& len, int modulus=1) {
 	len = (len/modulus) * modulus;
 	lastIndex += len;
 	if(lastIndex >= bufWords) lastIndex = 0;
-}
-
-
-static void lcd_and_ui_setup() {
-	lcd_spi_init();
-
-	digitalWrite(ili9341_cs, HIGH);
-	digitalWrite(xpt2046_cs, HIGH);
-	pinMode(ili9341_cs, OUTPUT);
-	pinMode(xpt2046_cs, OUTPUT);
-
-	// setup hooks
-	ili9341_conf_dc = ili9341_dc;
-	ili9341_spi_set_cs = [](bool selected) {
-		lcd_spi_waitDMA();
-		while(lcdInhibit) ;
-		// if the xpt2046 is currently selected, deselect it
-		if(selected && digitalRead(xpt2046_cs) == LOW) {
-			digitalWrite(xpt2046_cs, HIGH);
-		}
-		digitalWrite(ili9341_cs, selected ? LOW : HIGH);
-	};
-	ili9341_spi_transfer = [](uint32_t sdi, int bits) {
-		return lcd_spi_transfer(sdi, bits);
-	};
-	ili9341_spi_transfer_bulk = [](uint32_t words) {
-		while(lcdInhibit) ;
-		lcd_spi_transfer_bulk((uint8_t*)ili9341_spi_buffer, words*2);
-	};
-	ili9341_spi_wait_bulk = []() {
-		lcd_spi_waitDMA();
-	};
-	ili9341_spi_read = [](uint8_t *buf, uint32_t bytes) {
-		lcd_spi_read_bulk(buf, bytes);
-	};
-	xpt2046.spiSetCS = [](bool selected) {
-		// a single SPI master is used for both the ILI9346 display and the
-		// touch controller; if an outstanding background DMA is in progress,
-		// we must wait for it to complete.
-		lcd_spi_waitDMA();
-
-		// if the ili9341 is currently selected, deselect it.
-		if(selected && digitalRead(ili9341_cs) == LOW) {
-			digitalWrite(ili9341_cs, HIGH);
-		}
-		digitalWrite(xpt2046_cs, selected ? LOW : HIGH);
-	};
-	xpt2046.spiTransfer = [](uint32_t sdi, int bits) {
-		myassert(digitalRead(ili9341_cs) == HIGH);
-
-		digitalWrite(ili9341_cs, HIGH);
-
-		lcd_spi_slow();
-//		delayMicroseconds(10);
-		uint32_t ret = lcd_spi_transfer(sdi, bits);
-//		delayMicroseconds(10);
-		lcd_spi_write();
-		return ret;
-	};
-	delay(10);
-
-	xpt2046.begin(LCD_WIDTH, LCD_HEIGHT);
-
-	ili9341_init();
-	lcd_spi_write();
-	// show test pattern
-	//ili9341_test(5);
-	// clear screen
-	 ili9341_clear_screen();
-
-	// tell the plotting code how to calculate frequency in Hz given an index
-	plot_getFrequencyAt = [](int index) {
-		return UIActions::frequencyAt(index);
-	};
-
-	// the plotter will periodically call this function when doing cpu-heavy work;
-	// use it to process outstanding UI events so that the UI isn't sluggish.
-	plot_tick = []() {
-		UIActions::application_doEvents();
-	};
-
-	plot_init();
-
-	// redraw all zones next time we draw
-	redraw_request |= 0xff;
-
-	// don't block events
-	uiEnableProcessing();
-
-	// when the UI hardware emits an event, forward it to the UI code
-	UIHW::emitEvent = [](UIHW::UIEvent evt) {
-		// process the event on main thread; we are currently in interrupt context.
-		UIActions::enqueueEvent([evt]() {
-			ui_process(evt);
-		});
-	};
 }
 
 static void enterUSBDataMode() {
@@ -850,21 +747,21 @@ static void setVNASweepToUSB() {
 static void cmdRegisterWrite(int address) {
 	if(address == 0xee) {
 		usbCaptureMode = true;
-#pragma pack(push, 1)
-		constexpr struct {
-			uint16_t width;
-			uint16_t height;
-			uint8_t pixelFormat;
-		} meta = { LCD_WIDTH, LCD_HEIGHT, 16 };
-#pragma pack(pop)
-		serial.print((char*) &meta, sizeof(meta));
+// #pragma pack(push, 1)
+// 		constexpr struct {
+// 			uint16_t width;
+// 			uint16_t height;
+// 			uint8_t pixelFormat;
+// 		} meta = { LCD_WIDTH, LCD_HEIGHT, 16 };
+// #pragma pack(pop)
+// 		serial.print((char*) &meta, sizeof(meta));
 
-		// use uint16_t ili9341_spi_buffers for read buffer
-		static_assert(meta.width * 2 <= sizeof(ili9341_spi_buffers));
-		for (int y=0; y < meta.height; y+=1){
-			ili9341_read_memory(0, y, meta.width, 1, ili9341_spi_buffers);
-			serial.print((char*) ili9341_spi_buffers, meta.width * 2 * 1);
-		}
+// 		// use uint16_t ili9341_spi_buffers for read buffer
+// 		static_assert(meta.width * 2 <= sizeof(ili9341_spi_buffers));
+// 		for (int y=0; y < meta.height; y+=1){
+// 			ili9341_read_memory(0, y, meta.width, 1, ili9341_spi_buffers);
+// 			serial.print((char*) ili9341_spi_buffers, meta.width * 2 * 1);
+// 		}
 
 		usbCaptureMode = false;
 		return;
@@ -1147,6 +1044,8 @@ static void measurementEmitDataPoint(int freqIndex, freqHz_t freqHz, VNAObservat
 static void setVNASweepToUI() {
 	freqHz_t start = UIActions::get_sweep_frequency(ST_START);
 	freqHz_t stop = UIActions::get_sweep_frequency(ST_STOP);
+	start = 100000000;
+	stop =  300000000;	
 	freqHz_t step = 0;
 	if(current_props._sweep_points > 0)
 		step = (stop - start) / (current_props._sweep_points - 1);
@@ -1166,7 +1065,7 @@ static void setVNASweepToUI() {
 		start, step, current_props._sweep_points, current_props._avg
 	});
 #endif
-	update_grid();
+	//update_grid();
 }
 
 void updateAveraging() {
@@ -1374,7 +1273,7 @@ cal_interpolate(void)
   if (src_start == dst_start && src_step == dst_step && src->_sweep_points == dst->_sweep_points){
     memcpy(current_props._cal_data, src->_cal_data, sizeof(src->_cal_data));
     cal_status |= (src->_cal_status)&~CALSTAT_APPLY;
-    redraw_request |= REDRAW_CAL_STATUS;
+    //redraw_request |= REDRAW_CAL_STATUS;
     return;
   }
   // lower than start freq of src range
@@ -1417,7 +1316,7 @@ cal_interpolate(void)
     }
   }
   cal_status |= (src->_cal_status | CALSTAT_INTERPOLATED)&~CALSTAT_APPLY;
-  redraw_request |= REDRAW_CAL_STATUS;
+  //redraw_request |= REDRAW_CAL_STATUS;
 }
 
 
@@ -1497,7 +1396,7 @@ static bool processDataPoint() {
 		usbTxQueueRPos = rdRPos;
 
 		if(freqIndex == vnaMeasurement.sweepPoints - 1) {
-			transform_domain();
+			//transform_domain();
 			return true;
 		}
 	}
@@ -1506,30 +1405,30 @@ static bool processDataPoint() {
 
 // plot a single line and show which cells are redrawn
 void debug_plot_markmap() {
-	current_props._trace[0].enabled = 0;
-	current_props._trace[3].enabled = 0;
+	// current_props._trace[0].enabled = 0;
+	// current_props._trace[3].enabled = 0;
 
-	plot_shadeCells = false;
-	auto src = complexf(0.04f, 0.7f);
-	auto pt = complexf(0.12f, -0.6f);
+	// plot_shadeCells = false;
+	// auto src = complexf(0.04f, 0.7f);
+	// auto pt = complexf(0.12f, -0.6f);
 
-	for(int i=0; i<5; i++)
-		measured[0][i] = src;
-	for(int i=5; i<SWEEP_POINTS_MAX; i++)
-		measured[0][i] = pt;
-	plot_into_index(measured);
-	force_set_markmap();
+	// for(int i=0; i<5; i++)
+	// 	measured[0][i] = src;
+	// for(int i=5; i<SWEEP_POINTS_MAX; i++)
+	// 	measured[0][i] = pt;
+	// plot_into_index(measured);
+	// force_set_markmap();
 
-	draw_all_cells(true);
-	draw_all_cells(true);
-	draw_all_cells(true);
+	// draw_all_cells(true);
+	// draw_all_cells(true);
+	// draw_all_cells(true);
 
-	plot_into_index(measured);
-	plot_shadeCells = true;
-	draw_all_cells(true);
+	// plot_into_index(measured);
+	// plot_shadeCells = true;
+	// draw_all_cells(true);
 
-	UIActions::enterBootload();
-	while(true);
+	// UIActions::enterBootload();
+	// while(true);
 }
 
 /* Return true when FPU is available */
@@ -1622,18 +1521,18 @@ int main(void) {
 	nvic_set_priority(NVIC_USB_HP_CAN_TX_IRQ, 0xf0);
 
 	// set up lcd and hook up UI events
-	lcd_and_ui_setup();
+	//lcd_and_ui_setup();
 
 	// initialize UI hardware (buttons)
-	UIHW::init(tim2Period);
+	//UIHW::init(tim2Period);
 
 	// this timer is used by UI hardware to perform button ticks
-	ui_timer_setup();
+	//ui_timer_setup();
 
 	// work around spurious ui events at startup
 	delay(50);
-	while(eventQueue.readable())
-		eventQueue.dequeue();
+	//while(eventQueue.readable())
+	//	eventQueue.dequeue();
 
 	UIActions::cal_reset();
 
@@ -1641,21 +1540,21 @@ int main(void) {
 	// Load 0 slot
 	UIActions::cal_reset();
 	flash_caldata_recall(0);
-	if(config.ui_options & UI_OPTIONS_FLIP)
-		ili9341_set_flip(true, true);
+	//if(config.ui_options & UI_OPTIONS_FLIP)
+	//	ili9341_set_flip(true, true);
 
 	printk("SN: %08x-%08x-%08x\n", deviceID[0], deviceID[1], deviceID[2]);
 
 	// show dmesg and wait for user input if there is an important error
 	if(shouldShowDmesg) {
 		printk1("Touch anywhere to continue...\n");
-		show_dmesg();
+		//show_dmesg();
 	}
 
 	printk("xtal freq %d.%03d MHz\n", (xtalFreqHz/1000000), ((xtalFreqHz/1000) % 1000));
 
 	//debug_plot_markmap();
-	UIActions::printTouchCal();
+	//UIActions::printTouchCal();
 
 
 	bool si5351failed = false;
@@ -1692,7 +1591,7 @@ int main(void) {
 		printk1("ERROR: si5351 init failed\n");
 		printk1("Touch anywhere to continue...\n");
 		current_props._frequency0 = 200000000;
-		show_dmesg();
+		//show_dmesg();
 	}
     UIActions::rebuild_bbgain();
 #ifdef HAS_SELF_TEST
@@ -1703,8 +1602,10 @@ int main(void) {
 
 	usbTxQueueRPos = usbTxQueueWPos;
 	setVNASweepToUI();
+	usbDataMode=true;
+	setVNASweepToUSB();
 
-	redraw_frame();
+	//redraw_frame();
 
 	bool testSG = false;
 
@@ -1731,7 +1632,7 @@ int main(void) {
 
 			// display "usb mode" screen
 			if(!lastUSBDataMode) {
-				ui_mode_usb();
+				//ui_mode_usb();
 				setVNASweepToUSB();
 			}
 			lastUSBDataMode = usbDataMode;
@@ -1742,9 +1643,9 @@ int main(void) {
 		} else {
 			if(lastUSBDataMode) {
 				// exiting usb data mode
-				ui_mode_normal();
-				redraw_frame();
-				request_to_redraw_grid();
+				//ui_mode_normal();
+				//redraw_frame();
+				//request_to_redraw_grid();
 				setVNASweepToUI();
 			}
 		}
@@ -1756,34 +1657,34 @@ int main(void) {
 		// when we are in USB mode.
 		myassert(!usbDataMode);
 
-		if(sweep_enabled) {
-			if(processDataPoint()) {
-				// a full sweep has completed
-				if ((domain_mode & DOMAIN_MODE) == DOMAIN_TIME) {
-					plot_into_index(measured);
-					ui_marker_track();
-					if(!lcdInhibit) draw_all(true);
-					continue;
-				}
-			}
-		}
+		// if(sweep_enabled) {
+		// 	if(processDataPoint()) {
+		// 		// a full sweep has completed
+		// 		if ((domain_mode & DOMAIN_MODE) == DOMAIN_TIME) {
+		// 			plot_into_index(measured);
+		// 			ui_marker_track();
+		// 			if(!lcdInhibit) draw_all(true);
+		// 			continue;
+		// 		}
+		// 	}
+		// }
 
 		// if we have no pending events, use idle cycles to refresh the graph
-		if(!eventQueue.readable()) {
-			if(sweep_enabled) {
-				if((domain_mode & DOMAIN_MODE) == DOMAIN_FREQ) {
-					plot_into_index(measured);
-					ui_marker_track();
-				}
-			}
-			if(!lcdInhibit) draw_all(true);
-			continue;
-		}
-		auto callback = eventQueue.read();
-		eventQueue.dequeue();
-		if(!callback)
-			abort();
-		callback();
+		// if(!eventQueue.readable()) {
+		// 	if(sweep_enabled) {
+		// 		if((domain_mode & DOMAIN_MODE) == DOMAIN_FREQ) {
+		// 			plot_into_index(measured);
+		// 			ui_marker_track();
+		// 		}
+		// 	}
+		// 	if(!lcdInhibit) draw_all(true);
+		// 	continue;
+		// }
+		// auto callback = eventQueue.read();
+		// eventQueue.dequeue();
+		// if(!callback)
+		// 	abort();
+		// callback();
 	}
 }
 
@@ -1879,7 +1780,7 @@ namespace UIActions {
 			vnaMeasurement.nPeriodsMultiplier = current_props._avg;
 		#endif
 			current_props._cal_status |= (1 << type);
-			ui_cal_collected();
+			//ui_cal_collected();
 		};
 		uint32_t avgMult = 2;
 	#if BOARD_REVISION >= 4
@@ -1903,7 +1804,7 @@ namespace UIActions {
 	void cal_reset_all(void) {
 		current_props.setFieldsToDefault();
 		setVNASweepToUI();
-		force_set_markmap();
+//		force_set_markmap();
 	}
 
 	static inline void clampFrequency(freqHz_t& f) {
@@ -2075,15 +1976,15 @@ namespace UIActions {
 				force = true;
 		}
 		if (force) {
-			plot_into_index(measured);
-			force_set_markmap();
+			//plot_into_index(measured);
+			//force_set_markmap();
 		}
 	}
 	void set_trace_channel(int t, int channel)
 	{
 		if (trace[t].channel != channel) {
 			trace[t].channel = channel;
-			force_set_markmap();
+			//force_set_markmap();
 		}
 	}
 
@@ -2092,7 +1993,7 @@ namespace UIActions {
 		scale /= trace_info[trace[t].type].scale_unit;
 		if (trace[t].scale != scale) {
 			trace[t].scale = scale;
-			force_set_markmap();
+			//force_set_markmap();
 		}
 	}
 
@@ -2101,7 +2002,7 @@ namespace UIActions {
 	{
 		if (trace[t].refpos != refpos) {
 			trace[t].refpos = refpos;
-			force_set_markmap();
+			//force_set_markmap();
 		}
 	}
 
@@ -2109,7 +2010,7 @@ namespace UIActions {
 	{
 		if (electrical_delay != picoseconds) {
 			electrical_delay = picoseconds;
-			force_set_markmap();
+			//force_set_markmap();
 		}
 	}
 
@@ -2156,7 +2057,7 @@ namespace UIActions {
 		int ret = flash_caldata_recall(id);
 		if(ret == 0) {
 			setVNASweepToUI();
-			force_set_markmap();
+			//force_set_markmap();
 		}
 		return ret;
 	}

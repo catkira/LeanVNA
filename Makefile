@@ -4,7 +4,7 @@ OPENCM3_DIR    ?= libopencm3
 BOOTLOAD_PORT       ?= /dev/ttyACM0
 
 # device config
-BOARDNAME       ?= board_v2_plus4
+BOARDNAME       ?= board_v2_plus
 EXTRA_CFLAGS	?= -DDISPLAY_ST7796
 
 DEVICE          = gd32f303cc_nofpu
@@ -22,12 +22,9 @@ OBJS += $(BOARDNAME)/board.o \
     ili9341.o \
     main2.o \
     numfont20x22.o \
-    plot.o \
     sin_rom.o \
     stream_fifo.o \
     synthesizers.o \
-    ui.o \
-    uihw.o \
     vna_measurement.o \
     xpt2046.o \
     $(NULL)
@@ -66,7 +63,7 @@ OPENCM3_LIB     = $(OPENCM3_DIR)/lib/lib$(LIBNAME).a
 include $(OPENCM3_DIR)/mk/genlink-config.mk
 include $(OPENCM3_DIR)/mk/gcc-config.mk
 
-LDSCRIPT=./gd32f303cc_with_bootloader_plus4.ld
+LDSCRIPT=./gd32f303cc.ld
 
 .PHONY: dist-clean clean all
 
