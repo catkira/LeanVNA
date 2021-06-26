@@ -149,23 +149,4 @@ namespace board {
 
 	// set si5351 frequency for tx or rx port
 	void si5351_set(bool isRX, uint32_t freq_khz);
-
-	// sets up hardware spi for ili9341 and touch.
-	// spi peripheral only manages clk, sdi, and sdo.
-	void lcd_spi_init();
-
-	// three speed presets for ili9341 write/read and touch controller
-	void lcd_spi_write();
-	void lcd_spi_read();
-	void lcd_spi_slow();
-
-	// bits must be 16 or 8
-	uint32_t lcd_spi_transfer(uint32_t sdi, int bits);
-
-	void lcd_spi_transfer_bulk(uint8_t* buf, int bytes);
-
-	void lcd_spi_read_bulk(uint8_t* buf, int bytes);
-
-	// wait for all bulk transfers to complete
-	void lcd_spi_waitDMA();
 }
