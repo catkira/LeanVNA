@@ -69,9 +69,8 @@ using namespace board;
 // this can be any value since we are not using shared libraries.
 void* __dso_handle = (void*) &__dso_handle;
 
-static volatile bool outputRawSamples = false;
+bool outputRawSamples = false;
 static volatile bool rawAutoSwitch = false;
-static volatile bool usbDataMode = false;
 int cpu_mhz = 8; /* The CPU boots on internal (HSI) 8Mhz */
 
 
@@ -108,7 +107,7 @@ static volatile int usbTxQueueRPos = 0;
 // periods of a 1MHz clock; how often to call adc_process()
 static constexpr int tim1Period = 25;	// 1MHz / 25 = 40kHz
 
-static FIFO<small_function<void()>, 8> eventQueue;
+static volatile bool usbDataMode = false;
 
 static freqHz_t currFreqHz = 0;		// current hardware tx frequency
 
@@ -381,6 +380,11 @@ void setFrequency(freqHz_t freqHz) {
 	}
 }
 
+void sweepMutateParams(int freqIndex, sys_sweepPoint* outParams) {
+	sys_sweepPoint& sp = *outParams;
+	sp.adf4350_txPower = current_props._adf4350_txPower;
+}
+
 static void adc_setup() {
 	static uint8_t channel_array[1] = {adc_rxChannel};
 	dmaADC.buffer = adcBuffer;
@@ -412,6 +416,13 @@ void adc_read(volatile uint16_t*& data, int& len, int modulus=1) {
 	len = (len/modulus) * modulus;
 	lastIndex += len;
 	if(lastIndex >= bufWords) lastIndex = 0;
+}
+
+static void enterUSBDataMode() {
+	usbDataMode = true;
+}
+static void exitUSBDataMode() {
+	usbDataMode = false;
 }
 
 #ifdef BOARD_DISABLE_ECAL
@@ -476,7 +487,7 @@ static complexf applyFixedCorrectionsThru(complexf thru, freqHz_t freq) {
 
 
 bool serialSendTimeout(const char* s, int len, int timeoutMillis) {
-	for(volatile int i = 0; i < timeoutMillis; i++) {
+	for(int i = 0; i < timeoutMillis; i++) {
 		if(serial.trySend(s, len))
 			return true;
 		delay(1);
@@ -594,7 +605,9 @@ static void cmdReadRawFifo(const uint16_t nValues)
 static void cmdReadFIFO(int address, int nValues) 
 {
 	if(address != 0x30) 
-		return;	
+		return;
+	if(!usbDataMode)
+		enterUSBDataMode();			
 
 	if (nValues == 0) nValues = *(uint16_t*)(registers + 0x20);
 	for(int i=0; i<nValues;) {
@@ -677,8 +690,8 @@ static void cmdReadFIFO(int address, int nValues)
 
 // apply user-entered (on device) sweep parameters
 static void setVNASweepToUI() {
-	freqHz_t start = 100;
-	freqHz_t stop = 1000000;
+	freqHz_t start = 100000000;
+	freqHz_t stop =  300000000;
 	freqHz_t step = 0;
 	if(current_props._sweep_points > 0)
 		step = (stop - start) / (current_props._sweep_points - 1);
@@ -745,6 +758,8 @@ static void cmdRegisterWrite(int address) {
 		current_props._adf4350_txPower = (uint8_t)registers[0x42]; 
 		return;
 	}
+	if(!usbDataMode)
+		enterUSBDataMode();	
 	if(address == 0x00 || address == 0x10 || address == 0x20 || address == 0x22) 
 		setVNASweepToUSB();
 	if(address == 0x00)
@@ -761,6 +776,7 @@ static void cmdRegisterWrite(int address) {
 			outputRawSamples = true;
 		} else if(val == 2) {
 			outputRawSamples = false;
+			exitUSBDataMode();			
 		}
 	}
 	if(address == 0x27) 
@@ -1050,7 +1066,6 @@ static void measurementEmitDataPoint(int freqIndex, freqHz_t freqHz, VNAObservat
 //			}
 #endif
 			collectMeasurementType = -1;
-			eventQueue.enqueue(collectMeasurementCB);
 		}
 	}
 	// enqueue new data point
@@ -1265,7 +1280,6 @@ int main(void) {
 	si5351_i2c.init();
 	if(!synthesizers::si5351_setup())
 		si5351failed = true;
-
 	setFrequency(56000000);
 	updateIFrequency(300000);
 
@@ -1304,6 +1318,8 @@ int main(void) {
 		printk("BBGAIN %d: %.2f dB\n", i, log10f(gainTable[i])*20.f);
 	}
 
+	setVNASweepToUI();
+	usbDataMode=true;
 	setVNASweepToUSB();
 
 	while(true) {
@@ -1343,6 +1359,16 @@ extern "C" {
 		errorBlink(6);
 		while(1);
 	}
+	uint8_t crashDiagBuf[128] alignas(8);	
+	__attribute__((section(".start"), used))
+	const void* keepFunctions[] = {(void*)BOARD_REVISION_MAGIC,
+		(void*)&vnaMeasurement.sampleProcessor, (void*) adc_read,
+		(void*)calculateSynthWait, (void*)&MEASUREMENT_NPERIODS_NORMAL,
+		(void*)&MEASUREMENT_NPERIODS_CALIBRATING, (void*)&MEASUREMENT_ECAL_INTERVAL,
+		(void*)&MEASUREMENT_NWAIT_SWITCH, &lo_freq, &adf4350_freqStep,
+		sinROM50x1, sinROM48x1, sinROM25x2, sinROM24x2, sinROM10x2, sinROM200x1,
+		(void*)adc_process, &outputRawSamples, (void*)&vnaMeasurement.nPeriodsMultiplier,
+		crashDiagBuf, sinROM100x1, (void*) adcBuffer};	
 	__attribute__((used))
 	void __assert_fail(const char *__assertion, const char *__file,
                unsigned int __line, const char *__function) {

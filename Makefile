@@ -1,6 +1,7 @@
 # paths to libraries
-MCULIB         ?= ../mculib
-OPENCM3_DIR    ?= ../libopencm3-gd32f3
+MCULIB         ?= mculib
+OPENCM3_DIR    ?= libopencm3
+BOOTLOAD_PORT       ?= /dev/ttyACM0
 
 # device config
 BOARDNAME		= board_v2_3
@@ -8,7 +9,14 @@ DEVICE          = gd32f303cc_nofpu
 
 
 OBJS			+= main2.o $(BOARDNAME)/board.o gitversion.hpp
-OBJS            += $(MCULIB)/message_log.o $(MCULIB)/printf.o $(MCULIB)/fastwiring.o $(MCULIB)/si5351.o $(MCULIB)/dma_adc.o $(MCULIB)/dma_driver.o $(MCULIB)/usbserial.o
+OBJS	+= \
+	$(MCULIB)/dma_adc.o \
+	$(MCULIB)/dma_driver.o \
+	$(MCULIB)/fastwiring.o \
+	$(MCULIB)/message_log.o \
+	$(MCULIB)/printf.o \
+	$(MCULIB)/si5351.o \
+	$(MCULIB)/usbserial.o
 
 CFLAGS          += -O2 -g
 CPPFLAGS		+= -O2 -g -ffast-math -fstack-protector-strong -I$(BOARDNAME) -I$(MCULIB)/include -DMCULIB_DEVICE_STM32F103 -DSTM32F103 -DSTM32F1 -D_XOPEN_SOURCE=600
@@ -27,24 +35,37 @@ LDLIBS          += -Wl,--start-group -lgcc -lnosys -Wl,--end-group -lm
 
 GITVERSION		= "$(shell git log -n 1 --pretty=format:"git-%ad%h" --date=format:"%Y%m%d-")"
 
+LIBNAME         = opencm3_$(genlink_family)
+OPENCM3_LIB     = $(OPENCM3_DIR)/lib/lib$(LIBNAME).a
+
+# This is needed for the included genlink-config.mk to work properly
 include $(OPENCM3_DIR)/mk/genlink-config.mk
 include $(OPENCM3_DIR)/mk/gcc-config.mk
 
-LDSCRIPT = ./gd32f303cc_with_bootloader.ld
+LDSCRIPT=./gd32f303cc_with_bootloader_plus4.ld
 
-.PHONY: clean all
+.PHONY: dist-clean clean all
 
-all: binary.elf binary.hex binary.bin
+all: $(OPENCM3_LIB) binary.elf binary.hex binary.bin
+
+$(OPENCM3_LIB):
+	$(MAKE) -C $(OPENCM3_DIR)
 
 gitversion.hpp: .git/HEAD .git/index
 	echo "#define GITVERSION \"$(GITVERSION)\"" > $@
+	echo "#define GITURL \"$(GITURL)\"" >> $@
 
 clean:
-	$(Q)$(RM) -rf binary.* *.o
+	$(Q)$(RM) -rf binary.* *.o $(BOARDNAME)/*.o
+
+dist-clean: clean
+	make -C $(OPENCM3_DIR) clean
 
 flash: binary.hex
 	./st-flash --reset --format ihex write binary.hex
 
+bootload_firmware dfu: binary.bin
+	python3 bootload_firmware.py --file $< --serial $(BOOTLOAD_PORT)
 
 include $(OPENCM3_DIR)/mk/genlink-rules.mk
 include $(OPENCM3_DIR)/mk/gcc-rules.mk

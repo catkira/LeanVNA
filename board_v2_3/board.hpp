@@ -18,11 +18,9 @@
 #include "../rfsw.hpp"
 #include "../common.hpp"
 
-// change board name
-#undef BOARD_NAME
-#undef BOARD_REVISION
 #define BOARD_NAME "NanoVNA V2_3"
 #define BOARD_REVISION (3)
+#define BOARD_REVISION_MAGIC 0xdeadbabe
 
 //#define BOARD_DISABLE_ECAL
 
@@ -69,14 +67,10 @@ namespace board {
 	static constexpr Pad RFSW_REFL = PA8;
 	static constexpr Pad RFSW_RECV = PA9;
 
-	
+
 	static constexpr Pad lcd_clk = PB3;
 	static constexpr Pad lcd_mosi = PB5;
 	static constexpr Pad lcd_miso = PB4;
-	static constexpr Pad ili9341_cs = PA15;
-	static constexpr Pad ili9341_dc = PB6;
-	static constexpr Pad xpt2046_cs = PB7;
-	static constexpr Pad xpt2046_irq = PB8;
 
 	static constexpr Pad LEVER_LEFT = PB11;
 	static constexpr Pad LEVER_CENTER = PB12;
