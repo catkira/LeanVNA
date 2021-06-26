@@ -1090,80 +1090,6 @@ static void usb_transmit_rawSamples() {
 	rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(0));
 }
 
-static void apply_edelay(int i, complexf& refl, complexf& thru) {
-	if (electrical_delay == 0.0) return;
-	float w = 2 * M_PI * electrical_delay * UIActions::frequencyAt(i) * 1E-12;
-	complexf s = polar(1.f, w);
-	refl *= s;
-	thru *= s;
-}
-
-void cal_interpolate(void)
-{
-  const properties_t *src = caldata_reference();
-  properties_t *dst = &current_props;
-  int i, j;
-  int eterm;
-  if (src == NULL)
-    return;
-
-  freqHz_t src_start = src->startFreqHz();
-//freqHz_t src_stop = src->stopFreqHz();
-  freqHz_t src_step = src->stepFreqHz();
-  freqHz_t dst_start = dst->startFreqHz();
-//freqHz_t dst_stop = dst->stopFreqHz();
-  freqHz_t dst_step = dst->stepFreqHz();
-
-  // Upload not interpolated if some
-  if (src_start == dst_start && src_step == dst_step && src->_sweep_points == dst->_sweep_points){
-    memcpy(current_props._cal_data, src->_cal_data, sizeof(src->_cal_data));
-    cal_status |= (src->_cal_status)&~CALSTAT_APPLY;
-    //redraw_request |= REDRAW_CAL_STATUS;
-    return;
-  }
-  // lower than start freq of src range
-  for (i = 0; i < sweep_points; i++) {
-    freqHz_t dst_f = dst_start + i*dst_step;
-    if (dst_f >= src_start)
-      break;
-
-    // fill cal_data at head of src range
-    for (eterm = 0; eterm < CAL_ENTRIES; eterm++) {
-      cal_data[eterm][i] = src->_cal_data[eterm][0];
-    }
-  }
-
-  j = 0;
-  for (; i < sweep_points; i++) {
-    freqHz_t dst_f = dst_start + i*dst_step;
-    for (; j < src->_sweep_points; j++) {
-      freqHz_t src_f = src_start + j*src_step;
-      if (src_f <= dst_f && dst_f < src_f + src_step) {
-        // found f between freqs at j and j+1
-        float k1 = (src_step == 0) ? 0.0 : (float)(dst_f - src_f) / src_step;
-        int idx = j;
-        float k0 = 1.0 - k1;
-        for (eterm = 0; eterm < CAL_ENTRIES; eterm++) {
-          cal_data[eterm][i] = src->_cal_data[eterm][idx] * k0 + src->_cal_data[eterm][idx+1] * k1;
-        }
-        break;
-      }
-    }
-    if (j == src->_sweep_points-1)
-      break;
-  }
-
-  // upper than end freq of src range
-  for (; i < sweep_points; i++) {
-    // fill cal_data at tail of src
-    for (eterm = 0; eterm < CAL_ENTRIES; eterm++) {
-      cal_data[eterm][i] = src->_cal_data[eterm][src->_sweep_points-1];
-    }
-  }
-  cal_status |= (src->_cal_status | CALSTAT_INTERPOLATED)&~CALSTAT_APPLY;
-  //redraw_request |= REDRAW_CAL_STATUS;
-}
-
 /* Return true when FPU is available */
 bool cpu_enable_fpu(void)
 {
@@ -1192,7 +1118,6 @@ int main(void) {
 		shouldShowDmesg = true;
 	}
 #endif
-
 
 	boardInit();
 
@@ -1273,8 +1198,6 @@ int main(void) {
 
 	printk("xtal freq %d.%03d MHz\n", (xtalFreqHz/1000000), ((xtalFreqHz/1000) % 1000));
 
-
-
 	bool si5351failed = false;
 
 #if BOARD_REVISION < 4
@@ -1312,11 +1235,6 @@ int main(void) {
 		//show_dmesg();
 	}
     UIActions::rebuild_bbgain();
-#ifdef HAS_SELF_TEST
-	if(SelfTest::shouldEnterSelfTest()) {
-		SelfTest::performSelfTest(vnaMeasurement);
-	}
-#endif
 
 	usbTxQueueRPos = usbTxQueueWPos;
 	setVNASweepToUI();
@@ -1340,33 +1258,6 @@ extern "C" void abort() {
 		delay(1000);
 	}
 }
-/*
-extern "C" void *memcpy(void *dest, const void *src, size_t n) {
-	for(size_t i=0;i<n;i++)
-		((char*)dest)[i] = ((char*)src)[i];
-	return dest;
-}
-extern "C" void *memset(void *s, int c, size_t n) {
-	for(size_t i=0;i<n;i++)
-		((char*)s)[i] = c;
-}
-extern "C" size_t strlen(const char* s) {
-	int i = 0;
-	while(*s != 0) {
-		i++;
-		s++;
-	}
-	return i;
-}
-extern "C" int atoi(const char* s) {
-	// TODO: implement
-	return 0;
-}
-extern "C" void __aeabi_atexit(void * arg , void (* func ) (void *)) {
-	// Leave this function empty. Program never exits.
-}*/
-
-
 
 extern "C" {
 	__attribute__((used))
