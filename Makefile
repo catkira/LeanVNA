@@ -42,7 +42,7 @@ OPENCM3_LIB     = $(OPENCM3_DIR)/lib/lib$(LIBNAME).a
 include $(OPENCM3_DIR)/mk/genlink-config.mk
 include $(OPENCM3_DIR)/mk/gcc-config.mk
 
-LDSCRIPT=./gd32f303cc_with_bootloader_plus4.ld
+LDSCRIPT=./gd32f303cc.ld
 
 .PHONY: dist-clean clean all
 
