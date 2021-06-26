@@ -27,6 +27,9 @@ classdef LeanVNA  < handle
             flush(obj.s);
             pause(0.1);
         end
+        function exitRawMode(obj)
+            write([obj.s],[0x20 0x26 0x00],"uint8");
+        end        
         function collectData(obj,i)
             write(obj.s,[0x21 0x33 typecast(uint16(i), 'uint8')],"uint8")  % samplesPerPhase
         end
@@ -58,7 +61,7 @@ classdef LeanVNA  < handle
             if(obj.lastFrequency <= 140E6 & f > 140E6)
                 write(obj.s,[0x23 0x0 typecast(frequency, 'uint8')],'uint8');
             end
-            write(obj.s,[0x23 0x38],'uint8');
+            write(obj.s,[0x20 0x38 0],'uint8');
             obj.lastFrequency=frequency;
         end    
         function a = calculateIFAmplitudeFFT(obj,adcValues,Fs,loFreq)

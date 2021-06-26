@@ -103,6 +103,7 @@ function testLeanVNA
         end
         fIndex = fIndex+1;
     end    
+    vna.exitRawMode();    
 end
 
   
