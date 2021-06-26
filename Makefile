@@ -5,7 +5,6 @@ BOOTLOAD_PORT       ?= /dev/ttyACM0
 
 # device config
 BOARDNAME       ?= board_v2_plus
-
 DEVICE          = gd32f303cc_nofpu
 
 OBJS += $(BOARDNAME)/board.o \
@@ -25,7 +24,6 @@ OBJS	+= \
 CFLAGS         += -O2 -g
 CPPFLAGS       += -O2 -g -ffast-math -fstack-protector-strong -I$(BOARDNAME) -I$(MCULIB)/include -DMCULIB_DEVICE_STM32F103 -DSTM32F103 -DSTM32F1 -D_XOPEN_SOURCE=600
 CPPFLAGS       += -Wall -Wno-unused-function -Werror=implicit-fallthrough
-# CPPFLAGS      += -DDISPLAY_ST7796
 CPPFLAGS       +=  -ffunction-sections -fdata-sections
 # C++ only flags, CPP is used for both C++ and C files
 CXXFLAGS       += --std=c++17 -fno-exceptions -fno-rtti
