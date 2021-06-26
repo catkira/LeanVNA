@@ -139,8 +139,6 @@ namespace board {
 	constexpr int si5351_rxPort = 0, si5351_txPort = 2, si5351_passthruPort = -1;
 
 
-
-
 	// rf switch positions
 
 	static constexpr auto RFSW_ECAL_SHORT = RFSWState::RF4;
