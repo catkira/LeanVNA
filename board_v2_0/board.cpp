@@ -50,8 +50,6 @@ namespace board {
 	ADF4350::ADF4350Driver<adf4350_sendWord_t> adf4350_tx(adf4350_sendWord_t {adf4350_tx_spi});
 	ADF4350::ADF4350Driver<adf4350_sendWord_t> adf4350_rx(adf4350_sendWord_t {adf4350_rx_spi});
 
-	XPT2046 xpt2046(xpt2046_irq);
-
 	// same as rcc_set_usbpre, but with extended divider range:
 	// 0: divide by 1.5
 	// 1: divide by 1
@@ -169,120 +167,15 @@ namespace board {
 		adf4350_tx_spi.init();
 		adf4350_rx_spi.init();
 
-		digitalWrite(ili9341_cs, HIGH);
-		digitalWrite(xpt2046_cs, HIGH);
-		pinMode(ili9341_dc, OUTPUT);
-		pinMode(ili9341_cs, OUTPUT);
-		pinMode(xpt2046_cs, OUTPUT);
-
 		adc_ratecfg = ADC_SMPR_SMP_7DOT5CYC;
 		adc_srate = 6000000/(7.5+12.5);
 		adc_period_cycles = (7.5+12.5);
 		adc_clk = 6000000;
 	}
 
-
 	void ledPulse() {
 		digitalWrite(led2, HIGH);
 		delayMicroseconds(1);
 		digitalWrite(led2, LOW);
-	}
-
-	void lcd_spi_init() {
-		dmaChannelSPI.enable();
-		gpio_set_mode(lcd_clk.bank(), GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, lcd_clk.mask());
-		gpio_set_mode(lcd_mosi.bank(), GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, lcd_mosi.mask());
-		gpio_set_mode(lcd_miso.bank(), GPIO_MODE_INPUT, GPIO_CNF_INPUT_FLOAT, lcd_miso.mask());
-
-		rcc_periph_clock_enable(RCC_SPI1);
-		/* Reset SPI, SPI_CR1 register cleared, SPI is disabled */
-		spi_reset(SPI1);
-
-		/* Set up SPI in Master mode with:
-		* Clock baud rate: 1/64 of peripheral clock frequency
-		* Clock polarity: Idle High
-		* Clock phase: Data valid on 1st clock pulse
-		* Data frame format: 16-bit
-		* Frame format: MSB First
-		*/
-		spi_init_master(SPI1, SPI_CR1_BAUDRATE_FPCLK_DIV_64, SPI_CR1_CPOL_CLK_TO_1_WHEN_IDLE,
-						SPI_CR1_CPHA_CLK_TRANSITION_2, SPI_CR1_DFF_8BIT, SPI_CR1_MSBFIRST);
-
-		/*
-		* Set NSS management to software.
-		*
-		* Note:
-		* Setting nss high is very important, even if we are controlling the GPIO
-		* ourselves this bit needs to be at least set to 1, otherwise the spi
-		* peripheral will not send any data out.
-		*/
-		spi_enable_software_slave_management(SPI1);
-		spi_set_nss_high(SPI1);
-		
-		spi_enable_tx_dma(SPI1);
-
-		/* Enable SPI1 periph. */
-		spi_enable(SPI1);
-	}
-	void lcd_spi_fast() {
-		spi_set_baudrate_prescaler(SPI1, 0b001);
-	}
-	void lcd_spi_slow() {
-		spi_set_baudrate_prescaler(SPI1, 0b110);
-	}
-	
-	bool lcd_spi_isDMAInProgress = false;
-	
-	void lcd_spi_waitDMA() {
-		if(!lcd_spi_isDMAInProgress)
-			return;
-
-		// wait for dma finish
-		while(!dmaChannelSPI.finished());
-		dmaChannelSPI.stop();
-
-		// wait for all ongoing transfers to complete
-		while (!(SPI_SR(SPI1) & SPI_SR_TXE));
-		while ((SPI_SR(SPI1) & SPI_SR_BSY));
-		
-		// switch back to tx+rx mode
-		spi_set_unidirectional_mode(SPI1);
-		lcd_spi_isDMAInProgress = false;
-//		delayMicroseconds(10);
-	}
-	
-	uint32_t lcd_spi_transfer(uint32_t sdi, int bits) {
-		if(lcd_spi_isDMAInProgress)
-			lcd_spi_waitDMA();
-		uint32_t ret = 0;
-		if(bits == 16) {
-			ret = uint32_t(spi_xfer(SPI1, (uint16_t) (sdi >> 8))) << 8;
-		}
-		ret |= spi_xfer(SPI1, (uint16_t) sdi);
-		return ret;
-	}
-
-	void lcd_spi_transfer_bulk(uint8_t* buf, int bytes) {
-		if(lcd_spi_isDMAInProgress)
-			lcd_spi_waitDMA();
-
-		lcd_spi_isDMAInProgress = true;
-
-		// switch to tx only mode (do not put garbage in rx register)
-		spi_set_bidirectional_transmit_only_mode(SPI1);
-		DMATransferParams srcParams, dstParams;
-		srcParams.address = buf;
-		srcParams.bytesPerWord = 1;
-		srcParams.increment = true;
-
-		dstParams.address = &SPI_DR(SPI1);
-		dstParams.bytesPerWord = 1;
-		dstParams.increment = false;
-
-		dmaChannelSPI.setTransferParams(srcParams, dstParams,
-								DMADirection::MEMORY_TO_PERIPHERAL,
-								bytes, false);
-		dmaChannelSPI.start();
-		//lcd_spi_waitDMA();
 	}
 }

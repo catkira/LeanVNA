@@ -240,12 +240,6 @@ namespace board {
 		adf4350_tx_spi.init();
 		adf4350_rx_spi.init();
 
-		digitalWrite(ili9341_cs, HIGH);
-		digitalWrite(xpt2046_cs, HIGH);
-		pinMode(ili9341_dc, OUTPUT);
-		pinMode(ili9341_cs, OUTPUT);
-		pinMode(xpt2046_cs, OUTPUT);
-
 		adc_ratecfg = ADC_SMPR_SMP_7DOT5CYC;
 		adc_srate = 6000000/(7.5+12.5);
 		adc_period_cycles = (7.5+12.5);
