@@ -24,7 +24,6 @@ OBJS	+= \
 CFLAGS          += -O2 -g
 CPPFLAGS		+= -O2 -g -ffast-math -fstack-protector-strong -I$(BOARDNAME) -I$(MCULIB)/include -DMCULIB_DEVICE_STM32F103 -DSTM32F103 -DSTM32F1 -D_XOPEN_SOURCE=600
 CPPFLAGS		+= -Wall -Wno-unused-function -Werror=implicit-fallthrough
-#CPPFLAGS		+= -DDISPLAY_ST7796
 CPPFLAGS		+=  -ffunction-sections -fdata-sections
 #C++ only flags, CPP is used for both C++ and C files
 CXXFLAGS		+= --std=c++17 -fno-exceptions -fno-rtti
@@ -32,7 +31,7 @@ CXXFLAGS		+= --std=c++17 -fno-exceptions -fno-rtti
 # safe g++ flags
 CPPFLAGS		+= -funsigned-char -fwrapv -fno-delete-null-pointer-checks -fno-strict-aliasing
 
-LDFLAGS         += -static -nostartfiles -Wl,--exclude-libs,libssp -Wl,--print-memory-usage
+LDFLAGS			+= -static -nostartfiles -Wl,--exclude-libs,libssp -Wl,--print-memory-usage
 LDFLAGS			+= -Wl,--gc-sections
 LDLIBS          += -Wl,--start-group -lgcc -lnosys -Wl,--end-group -lm
 
@@ -42,7 +41,6 @@ GITURL          = "$(shell git config --get remote.origin.url)"
 LIBNAME         = opencm3_$(genlink_family)
 OPENCM3_LIB     = $(OPENCM3_DIR)/lib/lib$(LIBNAME).a
 
-# This is needed for the included genlink-config.mk to work properly
 include $(OPENCM3_DIR)/mk/genlink-config.mk
 include $(OPENCM3_DIR)/mk/gcc-config.mk
 
