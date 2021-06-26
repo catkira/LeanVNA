@@ -11,7 +11,7 @@
 #endif
 
 // allocated bytes per save area. must be a multiple of the flash page size (2048)
-constexpr uint32_t SAVEAREA_BYTES = 18432;;
+constexpr uint32_t SAVEAREA_BYTES = 18432;
 
 // total bytes of save areas
 constexpr uint32_t SAVETOTAL_BYTES = SAVEAREA_BYTES * SAVEAREA_MAX;

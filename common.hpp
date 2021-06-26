@@ -111,6 +111,12 @@ enum SweepParameter {
 };
 
 typedef struct {
+  int8_t enabled;
+  int16_t index;
+  freqHz_t frequency;
+} marker_t;
+
+typedef struct {
   uint8_t enabled;
   uint8_t type;
   uint8_t channel;
@@ -130,6 +136,7 @@ struct alignas(4) properties_t {
   float _electrical_delay; // picoseconds
 
   trace_t _trace[TRACES_MAX];
+  marker_t _markers[MARKERS_MAX];  
   uint8_t _avg;
   uint8_t _adf4350_txPower; // 0 to 3
   uint8_t _si5351_txPower; // 0 to 3
