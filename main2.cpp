@@ -1066,25 +1066,25 @@ void adc_process() {
 	}
 }
 
-static int cnt = 0;
-static void usb_transmit_rawSamples() {
-	volatile uint16_t* buf;
-	int len;
-	adc_read(buf, len);
-	int8_t tmpBuf[adcBufSize];
-	for(int i=0; i<len; i++)
-		tmpBuf[i] = int8_t(buf[i] >> 4) - 128;
-	serial.print((char*)tmpBuf, len);
+// static int cnt = 0;
+// static void usb_transmit_rawSamples() {
+// 	volatile uint16_t* buf;
+// 	int len;
+// 	adc_read(buf, len);
+// 	int8_t tmpBuf[adcBufSize];
+// 	for(int i=0; i<len; i++)
+// 		tmpBuf[i] = int8_t(buf[i] >> 4) - 128;
+// 	serial.print((char*)tmpBuf, len);
 
-	cnt += len;
+// 	cnt += len;
 
-	rfsw(RFSW_ECAL, RFSW_ECAL_NORMAL);
-	//rfsw(RFSW_RECV, ((cnt / 500) % 2) ? RFSW_RECV_REFL : RFSW_RECV_PORT2);
-	//rfsw(RFSW_REFL, ((cnt / 500) % 2) ? RFSW_REFL_ON : RFSW_REFL_OFF);
-	rfsw(RFSW_RECV, RFSW_RECV_PORT2);
-	rfsw(RFSW_REFL, RFSW_REFL_OFF);
-	rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(0));
-}
+// 	rfsw(RFSW_ECAL, RFSW_ECAL_NORMAL);
+// 	//rfsw(RFSW_RECV, ((cnt / 500) % 2) ? RFSW_RECV_REFL : RFSW_RECV_PORT2);
+// 	//rfsw(RFSW_REFL, ((cnt / 500) % 2) ? RFSW_REFL_ON : RFSW_REFL_OFF);
+// 	rfsw(RFSW_RECV, RFSW_RECV_PORT2);
+// 	rfsw(RFSW_REFL, RFSW_REFL_OFF);
+// 	rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(0));
+// }
 
 /* Return true when FPU is available */
 bool cpu_enable_fpu(void)
