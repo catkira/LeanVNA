@@ -262,12 +262,6 @@ namespace board {
 		return freqHz;
 	}
 
-	void ledPulse() {
-		digitalWrite(led2, HIGH);
-		delayMicroseconds(1);
-		digitalWrite(led2, LOW);
-	}
-
 #ifdef EXPERIMENTAL_SYNTHWAIT
 	int calculateSynthWaitAF(freqHz_t freqHz) {
 		if (freqHz < 1200000000) return 2;
@@ -295,4 +289,10 @@ namespace board {
 		return 5;
 	}
 #endif
+
+	void ledPulse() {
+		digitalWrite(led2, HIGH);
+		delayMicroseconds(1);
+		digitalWrite(led2, LOW);
+	}
 }
