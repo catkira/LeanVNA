@@ -52,6 +52,17 @@
 #include <libopencm3/cm3/scb.h>
 #include <libopencm3/cm3/vector.h>
 
+// unity build
+#include "command_parser.cpp"
+#include "vna_measurement.cpp"
+#include "globals.cpp"
+#include "stream_fifo.cpp"
+#include "flash.cpp"
+#include "gain_cal.cpp"
+#include "sin_rom.cpp"
+#include "common.cpp"
+#include "synthesizers.cpp"
+
 using namespace mculib;
 using namespace std;
 using namespace board;

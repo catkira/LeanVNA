@@ -9,17 +9,8 @@ BOARDNAME       ?= board_v2_plus
 DEVICE          = gd32f303cc_nofpu
 
 OBJS += $(BOARDNAME)/board.o \
-    command_parser.o \
-    common.o \
-    flash.o \
-    gain_cal.o \
     gitversion.hpp \
-    globals.o \
     main2.o \
-    sin_rom.o \
-    stream_fifo.o \
-    synthesizers.o \
-    vna_measurement.o \
     $(NULL)
 
 OBJS	+= \
