@@ -583,11 +583,7 @@ For a description of the command interface see command_parser.hpp
 -- 1a - 1f: reserved
 */
 
-
 static void cmdRegisterWrite(int address);
-
-//1425tX^^^^^^^^^^^^^^XXXXXXXXXXXXXXXXXXXXXXMMMMMM%Vc222$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$44443 \uuuuuuuuuuuuiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiyhz<ggggggggggggggggggggggggggggggggggg
-
 
 static void cmdReadFIFO(int address, int nValues) {
 	if(address != 0x30) 
