@@ -69,7 +69,7 @@ using namespace board;
 void* __dso_handle = (void*) &__dso_handle;
 
 static bool outputRawSamples = false;
-//static volatile bool rawAutoSwitch = false;
+static volatile bool rawAutoSwitch = false;
 int cpu_mhz = 8; /* The CPU boots on internal (HSI) 8Mhz */
 
 
@@ -83,7 +83,8 @@ static volatile uint16_t adcBuffer[adcBufSize];
 
 static VNAMeasurement vnaMeasurement;
 //static FIFO<uint16_t,8192> ADCValueQueue;
-//static RawVNAMeasurement<decltype(ADCValueQueue)> rawVnaMeasurement;
+static FIFO<uint16_t,4096> ADCValueQueue;
+static RawVNAMeasurement<decltype(ADCValueQueue)> rawVnaMeasurement;
 static CommandParser cmdParser;
 static StreamFIFO cmdInputFIFO;
 static uint8_t cmdInputBuffer[128];
@@ -605,28 +606,28 @@ For a description of the command interface see command_parser.hpp
 
 static void cmdReadRawFifo(const uint16_t nValues)
 {
-	// const int txBufSize=0x3f;
-	// volatile uint8_t txbuf[txBufSize];
-	// volatile uint32_t valuesLeft = nValues;
-	// while(valuesLeft > 0)
-	// {
-	// 	volatile int i=0;
-	// 	while(i<(txBufSize-1) && valuesLeft) 
-	// 	{
-	// 		if(!ADCValueQueue.readable())  // queue empty
-	// 			continue;
-	// 		if(!rawVnaMeasurement.started()) // prevent reading old data before the new collection process has started
-	// 			continue;
-	// 		__sync_synchronize();
-	// 		volatile uint16_t temp = ADCValueQueue.dequeue();
-	// 		txbuf[i++]=uint8_t(temp>>0);
-	// 		txbuf[i++]=uint8_t(temp>>8);
-	// 		valuesLeft--;
-	// 	}
-	// 	if(!serialSendTimeout((char*)txbuf, i, 1500)) // max number of bytes seems to be 0x3f
-	// 		return;
-	// }
-	// return;	
+	const int txBufSize=0x3f;
+	volatile uint8_t txbuf[txBufSize];
+	volatile uint32_t valuesLeft = nValues;
+	while(valuesLeft > 0)
+	{
+		volatile int i=0;
+		while(i<(txBufSize-1) && valuesLeft) 
+		{
+			if(!ADCValueQueue.readable())  // queue empty
+				continue;
+			if(!rawVnaMeasurement.started()) // prevent reading old data before the new collection process has started
+				continue;
+			__sync_synchronize();
+			volatile uint16_t temp = ADCValueQueue.dequeue();
+			txbuf[i++]=uint8_t(temp>>0);
+			txbuf[i++]=uint8_t(temp>>8);
+			valuesLeft--;
+		}
+		if(!serialSendTimeout((char*)txbuf, i, 1500)) // max number of bytes seems to be 0x3f
+			return;
+	}
+	return;	
 }
 
 static void cmdReadFIFO(int address, int nValues) 
@@ -772,7 +773,7 @@ static void setVNASweepToUSB() {
 #endif	
 }
 
-//static void measurementPhaseChanged(VNAMeasurementPhases ph);
+static void measurementPhaseChanged(VNAMeasurementPhases ph);
 
 static void cmdRegisterWrite(int address) {
 	if(address == 0xee) {
@@ -788,7 +789,6 @@ static void cmdRegisterWrite(int address) {
 	if(address == 0x00)
 	{
 		//freqHz_t f = (freqHz_t)*(uint64_t*)(registers + 0x00);
-		//setFrequency((freqHz_t)*(uint64_t*)(registers + 0x00));
 	}
 	if(address == 0x26) 
 	{
@@ -802,68 +802,70 @@ static void cmdRegisterWrite(int address) {
 			exitUSBDataMode();			
 		}
 	}
-	// if(address == 0x27) 
-	// {
-	// 	auto numBytes = *(uint16_t*)(registers + 0x27);
-	// 	cmdReadRawFifo(numBytes);
-	// }
+	if(address == 0x27) 
+	{
+		auto numBytes = *(uint16_t*)(registers + 0x27);
+		cmdReadRawFifo(numBytes);
+	}
 	if(address == 0x00 || address == 0x10 || address == 0x20) {
 		ecalState = ECAL_STATE_MEASURING;
 		vnaMeasurement.ecalIntervalPoints = 1;
 		vnaMeasurement.nPeriods = MEASUREMENT_NPERIODS_CALIBRATING;
 	}
 	if(address == 0x30) {
-		//ADCValueQueue.clear();
+		ADCValueQueue.clear();
 		usbTxQueueRPos = usbTxQueueWPos; // clear usbTxQueue
 	}
-	// if(address == 0x31) 
-	// {
-	// 	auto val = registers[0x31];
-	// 	if(val == 0)
-	// 		measurementPhaseChanged(VNAMeasurementPhases::REFERENCE);
-	// 	else if(val == 1)
-	// 		measurementPhaseChanged(VNAMeasurementPhases::REFL);
-	// 	else if(val == 2)
-	// 		measurementPhaseChanged(VNAMeasurementPhases::THRU);
-	// 	else if(val == 3)
-	// 		measurementPhaseChanged(VNAMeasurementPhases::ECALTHRU);
-	// 	else if(val == 4)
-	// 		measurementPhaseChanged(VNAMeasurementPhases::ECALLOAD);
-	// 	else if(val == 5)
-	// 		measurementPhaseChanged(VNAMeasurementPhases::ECALSHORT);
-	// }
-	// if(address == 0x32)
-	// {
-	// 	auto val = registers[0x32];
-	// 	if(val >= 0 &&  val <= 3)
-	// 		rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(val));
-	// }
-	// if(address == 0x33)
-	// {
-	// 	auto samplesPerPhase = *(uint16_t*)(registers + 0x33);
-	// 	rawAutoSwitch = true;
-	// 	rawVnaMeasurement.collectData(samplesPerPhase);
-	// }
-	// if(address == 0x35)
-	// {
-	// 	auto val = *(uint16_t*)(registers + 0x35);
-	// 	if(val)
-	// 		adf4350_powerup();
-	// 	else
-	// 		adf4350_powerdown();
-	// }	
-	// if(address == 0x36)
-	// {
-	// 	auto val = *(uint16_t*)(registers + 0x36);
-	// 	synthesizers::si5351_tx_powerCmd((bool)val);
-	// }		
-	// if(address == 0x37)
-	// {
-	// 	auto val = *(uint16_t*)(registers + 0x37);
-	// 	synthesizers::si5351_rx_powerCmd((bool)val);
-	// }		
-	
-	
+	if(address == 0x31) 
+	{
+		auto val = registers[0x31];
+		if(val == 0)
+			measurementPhaseChanged(VNAMeasurementPhases::REFERENCE);
+		else if(val == 1)
+			measurementPhaseChanged(VNAMeasurementPhases::REFL);
+		else if(val == 2)
+			measurementPhaseChanged(VNAMeasurementPhases::THRU);
+		else if(val == 3)
+			measurementPhaseChanged(VNAMeasurementPhases::ECALTHRU);
+		else if(val == 4)
+			measurementPhaseChanged(VNAMeasurementPhases::ECALLOAD);
+		else if(val == 5)
+			measurementPhaseChanged(VNAMeasurementPhases::ECALSHORT);
+	}
+	if(address == 0x32)
+	{
+		auto val = registers[0x32];
+		if(val >= 0 &&  val <= 3)
+			rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(val));
+	}
+	if(address == 0x33)
+	{
+		auto samplesPerPhase = *(uint16_t*)(registers + 0x33);
+		rawAutoSwitch = true;
+		rawVnaMeasurement.collectData(samplesPerPhase);
+	}
+	if(address == 0x35)
+	{
+		auto val = *(uint16_t*)(registers + 0x35);
+		if(val)
+			adf4350_powerup();
+		else
+			adf4350_powerdown();
+	}	
+	if(address == 0x36)
+	{
+		auto val = *(uint16_t*)(registers + 0x36);
+		synthesizers::si5351_tx_powerCmd((bool)val);
+	}		
+	if(address == 0x37)
+	{
+		auto val = *(uint16_t*)(registers + 0x37);
+		synthesizers::si5351_rx_powerCmd((bool)val);
+	}		
+	if(address == 0x38)
+	{
+        setFrequency((freqHz_t)*(uint64_t*)(registers + 0x00));
+	}	    
 }
 
 
@@ -896,6 +898,7 @@ static int measurementGetDefaultGain(freqHz_t freqHz) {
 	else
 		return 0;
 }
+
 // callback called by VNAMeasurement to change rf switch positions.
 static void measurementPhaseChanged(VNAMeasurementPhases ph) {
 	switch(ph) {
@@ -903,6 +906,8 @@ static void measurementPhaseChanged(VNAMeasurementPhases ph) {
 			rfsw(RFSW_REFL, RFSW_REFL_ON);
 			rfsw(RFSW_RECV, RFSW_RECV_REFL);
 			rfsw(RFSW_ECAL, RFSW_ECAL_OPEN);
+			if (!outputRawSamples)
+                rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(measurementGetDefaultGain(currFreqHz)));
 			break;
 		case VNAMeasurementPhases::REFL:
 			// If only measuring REFL and THRU, we skip REFERENCE and thus
@@ -910,31 +915,39 @@ static void measurementPhaseChanged(VNAMeasurementPhases ph) {
 			if (vnaMeasurement.measurement_mode == MEASURE_MODE_REFL_THRU) {
 				rfsw(RFSW_REFL, RFSW_REFL_ON);
 				rfsw(RFSW_RECV, RFSW_RECV_REFL);
-			}		
+			}
 			rfsw(RFSW_ECAL, RFSW_ECAL_NORMAL);
-			break;
+			if (!outputRawSamples)
+	    		rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(measurementGetDefaultGain(currFreqHz)));
+            break;
 		case VNAMeasurementPhases::THRU:
 			rfsw(RFSW_ECAL, RFSW_ECAL_NORMAL);
 			rfsw(RFSW_REFL, RFSW_REFL_OFF);
 			rfsw(RFSW_RECV, RFSW_RECV_PORT2);
+            if (!outputRawSamples)
+	            rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(vnaMeasurement.currThruGain));
 			break;
 		case VNAMeasurementPhases::ECALTHRU:
 			rfsw(RFSW_ECAL, RFSW_ECAL_LOAD);
 			rfsw(RFSW_RECV, RFSW_RECV_REFL);
+			if (!outputRawSamples)
+    			rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(measurementGetDefaultGain(currFreqHz)));
 			break;
 		case VNAMeasurementPhases::ECALLOAD:
 			rfsw(RFSW_REFL, RFSW_REFL_ON);
 			rfsw(RFSW_RECV, RFSW_RECV_REFL);
 			rfsw(RFSW_ECAL, RFSW_ECAL_LOAD);
+			if (!outputRawSamples)
+    			rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(measurementGetDefaultGain(currFreqHz)));
 			break;
 		case VNAMeasurementPhases::ECALSHORT:
 			rfsw(RFSW_ECAL, RFSW_ECAL_SHORT);
+            if (!outputRawSamples)
+                rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(measurementGetDefaultGain(currFreqHz)));
 			break;
-		default:
-			break;
+        case VNAMeasurementPhases::IDLE:
+            break;
 	}
-	if(!outputRawSamples)
-		rfsw(RFSW_BBGAIN, RFSW_BBGAIN_GAIN(measurementGetDefaultGain(currFreqHz)));	
 }
 
 // Allow smooth complex data point array (this remove noise, smooth power depend form count)
@@ -1114,10 +1127,10 @@ static void measurementEmitDataPoint(int freqIndex, freqHz_t freqHz, VNAObservat
 	}
 }
 
-// static void rawMeasurementEmitData()
-// {
-// 	rawAutoSwitch = false;
-// }
+static void rawMeasurementEmitData()
+{
+	rawAutoSwitch = false;
+}
 
 void updateAveraging() {
 	int avg = current_props._avg;
@@ -1164,14 +1177,14 @@ static void measurement_setup() {
 	vnaMeasurement.gainMax = RFSW_BBGAIN_MAX;
 	vnaMeasurement.init();
 
-	// rawVnaMeasurement.phaseChanged = [](VNAMeasurementPhases ph) {
-	// 	measurementPhaseChanged(ph);
-	// };	
-	// rawVnaMeasurement.emitData = [](){
-	// 	rawMeasurementEmitData();
-	// };
-	// rawVnaMeasurement.ADCValueQueue = &ADCValueQueue;
-	// rawVnaMeasurement.init();	
+	rawVnaMeasurement.phaseChanged = [](VNAMeasurementPhases ph) {
+		measurementPhaseChanged(ph);
+	};	
+	rawVnaMeasurement.emitData = [](){
+		rawMeasurementEmitData();
+	};
+	rawVnaMeasurement.ADCValueQueue = &ADCValueQueue;
+	rawVnaMeasurement.init();	
 }
 
 
@@ -1180,32 +1193,32 @@ static void adc_process() {
 	int len;
 	for(int i=0; i<2; i++) {
 		adc_read(buf, len);
-		// if(outputRawSamples)
-		// {
-		// 	if(rawAutoSwitch)
-		// 	{
-		// 		rawVnaMeasurement.processSamples((uint16_t*)buf, len);
-		// 	}
-		// 	else
-		// 	{
-		// 		for(int k=0;k<len;k++)
-		// 		{
-		// 			if(!ADCValueQueue.writable()) 
-		// 			{
-		// 				// overflow, discard remaining values
-		// 				// if this happens, phase information gets lost and S11/S21 phase cannot be calculated!
-		// 				// therefore better use rawAutoSwitch=true mode, if phase is needed
-		// 				break;
-		// 			} 			
-		// 			else
-		// 			{
-		// 				//ADCValueQueue.enqueue(buf[k]);
-		// 			}
-		// 		}
-		// 	}
+		if(outputRawSamples)
+		{
+			if(rawAutoSwitch)
+			{
+				rawVnaMeasurement.processSamples((uint16_t*)buf, len);
+			}
+			else
+			{
+				for(int k=0;k<len;k++)
+				{
+					if(!ADCValueQueue.writable()) 
+					{
+						// overflow, discard remaining values
+						// if this happens, phase information gets lost and S11/S21 phase cannot be calculated!
+						// therefore better use rawAutoSwitch=true mode, if phase is needed
+						break;
+					} 			
+					else
+					{
+						//ADCValueQueue.enqueue(buf[k]);
+					}
+				}
+			}
 			
-		// }
-		// else
+		}
+		else
 			vnaMeasurement.processSamples((uint16_t*)buf, len);
 	}
 }

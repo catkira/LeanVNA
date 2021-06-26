@@ -58,6 +58,7 @@ classdef LeanVNA  < handle
             if(obj.lastFrequency <= 140E6 & f > 140E6)
                 write(obj.s,[0x23 0x0 typecast(frequency, 'uint8')],'uint8');
             end
+            write(obj.s,[0x23 0x38],'uint8');
             obj.lastFrequency=frequency;
         end    
         function a = calculateIFAmplitudeFFT(obj,adcValues,Fs,loFreq)

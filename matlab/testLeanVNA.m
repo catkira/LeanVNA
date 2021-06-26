@@ -4,7 +4,8 @@ function testLeanVNA
     clear global
     global S21 S11
 
-    numValues = 2048; % max 2048
+    %numValues = 2048; % max 2048
+    numValues = 1024; % max 2048
     Fs=1500000; 
     nAverages = 1;
     fStart = 100E6;
