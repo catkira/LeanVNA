@@ -49,7 +49,6 @@
 #include <libopencm3/cm3/scb.h>
 #include <libopencm3/cm3/vector.h>
 
-
 // unity build
 #include "command_parser.cpp"
 #include "vna_measurement.cpp"
@@ -907,6 +906,12 @@ static void measurementPhaseChanged(VNAMeasurementPhases ph) {
 			rfsw(RFSW_ECAL, RFSW_ECAL_OPEN);
 			break;
 		case VNAMeasurementPhases::REFL:
+			// If only measuring REFL and THRU, we skip REFERENCE and thus
+			// the rfsw are not setup correct, so fix it here
+			if (vnaMeasurement.measurement_mode == MEASURE_MODE_REFL_THRU) {
+				rfsw(RFSW_REFL, RFSW_REFL_ON);
+				rfsw(RFSW_RECV, RFSW_RECV_REFL);
+			}		
 			rfsw(RFSW_ECAL, RFSW_ECAL_NORMAL);
 			break;
 		case VNAMeasurementPhases::THRU:
@@ -1220,6 +1225,21 @@ bool cpu_enable_fpu(void)
 }
 
 int main(void) {
+	bool shouldShowDmesg = false;
+
+#ifndef GD32F3_NOFPU
+	if(cpu_enable_fpu()) {
+		printk1("LIBOPENCM3 DID NOT ENABLE FPU!\n CHECK lib/dispatch/vector_chipset.c\n");
+	} else {
+		// printk1() does not invoke printf() and does not use fpu
+
+		// if you encounter this error, see:
+		// https://www.amobbs.com/thread-5719892-1-1.html
+		printk1("FPU NOT DETECTED!\nCHECK GD32F303 BATCH OR REBUILD WITHOUT FPU\n");
+		shouldShowDmesg = true;
+	}
+#endif
+
 	boardInit();
 
 	uint32_t* deviceID = (uint32_t*)0x1FFFF7E8;
@@ -1288,6 +1308,14 @@ int main(void) {
 	UIActions::cal_reset();
 	flash_caldata_recall(0);	
 
+	printk("SN: %08x-%08x-%08x\n", deviceID[0], deviceID[1], deviceID[2]);
+
+	// show dmesg and wait for user input if there is an important error
+	if(shouldShowDmesg) {
+		printk1("Touch anywhere to continue...\n");
+		//show_dmesg();
+	}
+
 	printk("xtal freq %d.%03d MHz\n", (xtalFreqHz/1000000), ((xtalFreqHz/1000) % 1000));
 
 	bool si5351failed = false;
@@ -1326,6 +1354,7 @@ int main(void) {
 		//show_dmesg();
 	}
 	UIActions::rebuild_bbgain();
+	
 	usbTxQueueRPos = usbTxQueueWPos;
 
 	performGainCal(vnaMeasurement, gainTable, RFSW_BBGAIN_MAX);
