@@ -10,23 +10,17 @@ EXTRA_CFLAGS	?= -DDISPLAY_ST7796
 DEVICE          = gd32f303cc_nofpu
 
 OBJS += $(BOARDNAME)/board.o \
-    Font5x7.o \
-    Font7x13b.o \
     command_parser.o \
     common.o \
-    fft.o \
     flash.o \
     gain_cal.o \
     gitversion.hpp \
     globals.o \
-    ili9341.o \
     main2.o \
-    numfont20x22.o \
     sin_rom.o \
     stream_fifo.o \
     synthesizers.o \
     vna_measurement.o \
-    xpt2046.o \
     $(NULL)
 
 OBJS	+= \

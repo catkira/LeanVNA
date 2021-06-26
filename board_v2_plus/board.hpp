@@ -17,7 +17,6 @@
 
 #include "../rfsw.hpp"
 #include "../common.hpp"
-#include "../xpt2046.hpp"
 
 #define BOARD_NAME "NanoVNA V2 Plus"
 #define BOARD_REVISION (3)
@@ -72,10 +71,6 @@ namespace board {
 	static constexpr Pad lcd_clk = PB3;
 	static constexpr Pad lcd_mosi = PB5;
 	static constexpr Pad lcd_miso = PB4;
-	static constexpr Pad ili9341_cs = PA15;
-	static constexpr Pad ili9341_dc = PB6;
-	static constexpr Pad xpt2046_cs = PB7;
-	static constexpr Pad xpt2046_irq = PB8;
 
 	static constexpr Pad LEVER_LEFT = PB11;
 	static constexpr Pad LEVER_CENTER = PB12;
@@ -144,10 +139,6 @@ namespace board {
 	constexpr int si5351_rxPort = 0, si5351_txPort = 2, si5351_passthruPort = -1;
 
 
-
-	// lcd display
-
-	extern XPT2046 xpt2046;
 
 	// rf switch positions
 

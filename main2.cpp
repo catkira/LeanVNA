@@ -32,8 +32,6 @@
 
 #include "main.hpp"
 #include <board.hpp>
-#include "ili9341.hpp"
-#include "plot.hpp"
 #include "common.hpp"
 #include "globals.hpp"
 #include "synthesizers.hpp"
@@ -41,7 +39,6 @@
 #include "fifo.hpp"
 #include "flash.hpp"
 #include "calibration.hpp"
-#include "fft.hpp"
 #include "command_parser.hpp"
 #include "stream_fifo.hpp"
 #include "sin_rom.hpp"
@@ -746,24 +743,6 @@ static void setVNASweepToUSB() {
 }
 static void cmdRegisterWrite(int address) {
 	if(address == 0xee) {
-		usbCaptureMode = true;
-// #pragma pack(push, 1)
-// 		constexpr struct {
-// 			uint16_t width;
-// 			uint16_t height;
-// 			uint8_t pixelFormat;
-// 		} meta = { LCD_WIDTH, LCD_HEIGHT, 16 };
-// #pragma pack(pop)
-// 		serial.print((char*) &meta, sizeof(meta));
-
-// 		// use uint16_t ili9341_spi_buffers for read buffer
-// 		static_assert(meta.width * 2 <= sizeof(ili9341_spi_buffers));
-// 		for (int y=0; y < meta.height; y+=1){
-// 			ili9341_read_memory(0, y, meta.width, 1, ili9341_spi_buffers);
-// 			serial.print((char*) ili9341_spi_buffers, meta.width * 2 * 1);
-// 		}
-
-		usbCaptureMode = false;
 		return;
 	}
 	if (address == 0x40) {UIActions::set_averaging(registers[0x40]); return;}
@@ -1170,80 +1149,6 @@ static float kaiser_window(float k, float n, float beta) {
 	return bessel0(beta * sqrt(1 - r * r)) / bessel0(beta);
 }
 
-static void transform_domain() {
-	if ((domain_mode & DOMAIN_MODE) != DOMAIN_TIME) return; // nothing to do for freq domain
-	// use spi_buffer as temporary buffer
-	// and calculate ifft for time domain
-	float* tmp = (float*)ili9341_spi_buffers;
-
-	// lowpass uses 2x sweep_points of input buffer space
-	static_assert((sizeof(measuredFreqDomain[0]) * 2) <= sizeof(ili9341_spi_buffers));
-	static_assert(FFT_SIZE*sizeof(float)*2 <= sizeof(ili9341_spi_buffers));
-
-	int points = current_props._sweep_points;
-	int window_size = current_props._sweep_points, offset = 0;
-	bool is_lowpass = false;
-	switch (domain_mode & TD_FUNC) {
-		case TD_FUNC_BANDPASS:
-			offset = 0;
-			window_size = points;
-			break;
-		case TD_FUNC_LOWPASS_IMPULSE:
-		case TD_FUNC_LOWPASS_STEP:
-			is_lowpass = true;
-			offset = points;
-			window_size = points * 2;
-			break;
-	}
-
-	float beta = 0.0;
-	switch (domain_mode & TD_WINDOW) {
-		case TD_WINDOW_MINIMUM:
-			beta = 0.0; // this is rectangular
-			break;
-		case TD_WINDOW_NORMAL:
-			beta = 6.0;
-			break;
-		case TD_WINDOW_MAXIMUM:
-			beta = 13;
-			break;
-	}
-
-
-	for (int ch = 0; ch < 2; ch++) {
-		memcpy(tmp, measuredFreqDomain[ch], sizeof(measuredFreqDomain[0]));
-		for (int i = 0; i < points; i++) {
-			float w = kaiser_window(i+offset, window_size, beta);
-			tmp[i*2+0] *= w;
-			tmp[i*2+1] *= w;
-		}
-		for (int i = points; i < FFT_SIZE; i++) {
-			tmp[i*2+0] = 0.0;
-			tmp[i*2+1] = 0.0;
-		}
-		if (is_lowpass) {
-			for (int i = 1; i < points; i++) {
-				tmp[(FFT_SIZE-i)*2+0] =  tmp[i*2+0];
-				tmp[(FFT_SIZE-i)*2+1] = -tmp[i*2+1];
-			}
-		}
-
-		fft_inverse((float(*)[2])tmp);
-		memcpy(measured[ch], tmp, sizeof(measured[0]));
-		for (int i = 0; i < points; i++) {
-			measured[ch][i] /= (float)FFT_SIZE;
-			if (is_lowpass) {
-				measured[ch][i] = {measured[ch][i].real(), 0.f};
-			}
-		}
-		if ( (domain_mode & TD_FUNC) == TD_FUNC_LOWPASS_STEP ) {
-			for (int i = 1; i < points; i++) {
-				measured[ch][i] += measured[ch][i-1];
-			}
-		}
-	}
-}
-
 static void apply_edelay(int i, complexf& refl, complexf& thru) {
 	if (electrical_delay == 0.0) return;
 	float w = 2 * M_PI * electrical_delay * UIActions::frequencyAt(i) * 1E-12;
@@ -1403,34 +1308,6 @@ static bool processDataPoint() {
 	return false;
 }
 
-// plot a single line and show which cells are redrawn
-void debug_plot_markmap() {
-	// current_props._trace[0].enabled = 0;
-	// current_props._trace[3].enabled = 0;
-
-	// plot_shadeCells = false;
-	// auto src = complexf(0.04f, 0.7f);
-	// auto pt = complexf(0.12f, -0.6f);
-
-	// for(int i=0; i<5; i++)
-	// 	measured[0][i] = src;
-	// for(int i=5; i<SWEEP_POINTS_MAX; i++)
-	// 	measured[0][i] = pt;
-	// plot_into_index(measured);
-	// force_set_markmap();
-
-	// draw_all_cells(true);
-	// draw_all_cells(true);
-	// draw_all_cells(true);
-
-	// plot_into_index(measured);
-	// plot_shadeCells = true;
-	// draw_all_cells(true);
-
-	// UIActions::enterBootload();
-	// while(true);
-}
-
 /* Return true when FPU is available */
 bool cpu_enable_fpu(void)
 {
@@ -1520,19 +1397,8 @@ int main(void) {
 
 	nvic_set_priority(NVIC_USB_HP_CAN_TX_IRQ, 0xf0);
 
-	// set up lcd and hook up UI events
-	//lcd_and_ui_setup();
-
-	// initialize UI hardware (buttons)
-	//UIHW::init(tim2Period);
-
-	// this timer is used by UI hardware to perform button ticks
-	//ui_timer_setup();
-
 	// work around spurious ui events at startup
 	delay(50);
-	//while(eventQueue.readable())
-	//	eventQueue.dequeue();
 
 	UIActions::cal_reset();
 
@@ -1540,8 +1406,6 @@ int main(void) {
 	// Load 0 slot
 	UIActions::cal_reset();
 	flash_caldata_recall(0);
-	//if(config.ui_options & UI_OPTIONS_FLIP)
-	//	ili9341_set_flip(true, true);
 
 	printk("SN: %08x-%08x-%08x\n", deviceID[0], deviceID[1], deviceID[2]);
 
@@ -1553,8 +1417,6 @@ int main(void) {
 
 	printk("xtal freq %d.%03d MHz\n", (xtalFreqHz/1000000), ((xtalFreqHz/1000) % 1000));
 
-	//debug_plot_markmap();
-	//UIActions::printTouchCal();
 
 
 	bool si5351failed = false;
@@ -1605,86 +1467,9 @@ int main(void) {
 	usbDataMode=true;
 	setVNASweepToUSB();
 
-	//redraw_frame();
-
-	bool testSG = false;
-
-	if(testSG) {
-		while(1) {
-			uint16_t tmp = 1;
-			vnaMeasurement.processSamples(&tmp, 1);
-		}
-		return 0;
-	}
-
-
-	bool lastUSBDataMode = false;
 	while(true) {
 		// process any outstanding commands from usb
 		cmdInputFIFO.drain();
-		if (usbCaptureMode) {
-			continue;
-		}
-
-		if(usbDataMode) {
-			if(outputRawSamples)
-				usb_transmit_rawSamples();
-
-			// display "usb mode" screen
-			if(!lastUSBDataMode) {
-				//ui_mode_usb();
-				setVNASweepToUSB();
-			}
-			lastUSBDataMode = usbDataMode;
-
-			// process ui events, but skip processing data points
-			UIActions::application_doSingleEvent();
-			continue;
-		} else {
-			if(lastUSBDataMode) {
-				// exiting usb data mode
-				//ui_mode_normal();
-				//redraw_frame();
-				//request_to_redraw_grid();
-				setVNASweepToUI();
-			}
-		}
-		lastUSBDataMode = usbDataMode;
-
-		// read data points from the values FIFO and plot them.
-		// there is only one values FIFO that is used in both USB mode
-		// and normal UI mode; therefore the execution should not reach here
-		// when we are in USB mode.
-		myassert(!usbDataMode);
-
-		// if(sweep_enabled) {
-		// 	if(processDataPoint()) {
-		// 		// a full sweep has completed
-		// 		if ((domain_mode & DOMAIN_MODE) == DOMAIN_TIME) {
-		// 			plot_into_index(measured);
-		// 			ui_marker_track();
-		// 			if(!lcdInhibit) draw_all(true);
-		// 			continue;
-		// 		}
-		// 	}
-		// }
-
-		// if we have no pending events, use idle cycles to refresh the graph
-		// if(!eventQueue.readable()) {
-		// 	if(sweep_enabled) {
-		// 		if((domain_mode & DOMAIN_MODE) == DOMAIN_FREQ) {
-		// 			plot_into_index(measured);
-		// 			ui_marker_track();
-		// 		}
-		// 	}
-		// 	if(!lcdInhibit) draw_all(true);
-		// 	continue;
-		// }
-		// auto callback = eventQueue.read();
-		// eventQueue.dequeue();
-		// if(!callback)
-		// 	abort();
-		// callback();
 	}
 }
 
@@ -2101,20 +1886,5 @@ namespace UIActions {
 				abort();
 			callback();
 		}
-	}
-
-	void application_doSingleEvent() {
-		// process any outstanding commands from usb
-		cmdInputFIFO.drain();
-		if(eventQueue.readable()) {
-			auto callback = eventQueue.read();
-			eventQueue.dequeue();
-			if(!callback)
-				abort();
-			callback();
-		}
-	}
-	void enqueueEvent(const small_function<void()>& cb) {
-		eventQueue.enqueue(cb);
 	}
 }

@@ -52,8 +52,6 @@ namespace board {
 	ADF4350::ADF4350Driver<adf4350_sendWord_t> adf4350_tx(adf4350_sendWord_t {adf4350_tx_spi});
 	ADF4350::ADF4350Driver<adf4350_sendWord_t> adf4350_rx(adf4350_sendWord_t {adf4350_rx_spi});
 
-	XPT2046 xpt2046(xpt2046_irq);
-
 	// same as rcc_set_usbpre, but with extended divider range:
 	// 0: divide by 1.5
 	// 1: divide by 1
@@ -232,12 +230,6 @@ namespace board {
 
 		adf4350_tx_spi.init();
 		adf4350_rx_spi.init();
-
-		digitalWrite(ili9341_cs, HIGH);
-		digitalWrite(xpt2046_cs, HIGH);
-		pinMode(ili9341_dc, OUTPUT);
-		pinMode(ili9341_cs, OUTPUT);
-		pinMode(xpt2046_cs, OUTPUT);
 
 		adc_ratecfg = ADC_SMPR_SMP_7DOT5CYC;
 		adc_srate = 30000000/(7.5+12.5);

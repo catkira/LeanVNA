@@ -1,5 +1,4 @@
 #include "globals.hpp"
-#include "ili9341.hpp"
 #include <board.hpp>
 
 volatile bool sweep_enabled = true;
@@ -12,15 +11,6 @@ int16_t lastsaveid = 0;
 config_t config = {
   .magic =             CONFIG_MAGIC,
   .dac_value =         1922,
-  .grid_color =        DEFAULT_GRID_COLOR,
-  .menu_normal_color = DEFAULT_MENU_COLOR,
-  .menu_active_color = DEFAULT_MENU_ACTIVE_COLOR,
-  .trace_color =       { DEFAULT_TRACE_1_COLOR, DEFAULT_TRACE_2_COLOR, DEFAULT_TRACE_3_COLOR, DEFAULT_TRACE_4_COLOR },
-#ifndef DISPLAY_ST7796
-  .touch_cal =         { 1950, 1900, -90, -120 },  //{ 620, 600, 160, 190 }, // 2.8 display module
-#else
-  .touch_cal =         { 1977, 1945, -61, -91 },   // 4' display module
-#endif
   .default_loadcal =   0,
   .harmonic_freq_threshold = 300000000,
   .ui_options =        0,
