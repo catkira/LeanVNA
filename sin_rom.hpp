@@ -1,9 +1,6 @@
 #pragma once
 #include <stdint.h>
 
-// period = 8; 8 periods
-extern const int16_t sinROM8x8[128];
-
 // period = 50; 1 period
 extern const int16_t sinROM50x1[100];
 
@@ -22,11 +19,14 @@ extern const int16_t sinROM6x2[24];
 // period = 3; 4 periods
 extern const int16_t sinROM3x4[24];
 
-// period = 200; 1 period
-extern const int16_t sinROM200x1[400];
+// period = 4; 3 periods
+extern const int16_t sinROM4x3[24];
 
 // period = 10; 2 periods
 extern const int16_t sinROM10x2[40];
+
+// period = 200; 1 period
+extern const int16_t sinROM200x1[400];
 
 // period = 100; 1 period
 extern const int16_t sinROM100x1[200];
