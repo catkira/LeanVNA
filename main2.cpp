@@ -590,10 +590,11 @@ static void cmdRegisterWrite(int address);
 
 
 static void cmdReadFIFO(int address, int nValues) {
-	if(address != 0x30) return;
+	if(address != 0x30) 
+		return;
 	if(!usbDataMode)
 		enterUSBDataMode();
-	// Set count as sweepPoints if 0
+
 	if (nValues == 0) nValues = *(uint16_t*)(registers + 0x20);
 	for(int i=0; i<nValues;) {
 		int rdRPos = usbTxQueueRPos;
@@ -607,17 +608,6 @@ static void cmdReadFIFO(int address, int nValues) {
 		usbDataPoint& usbDP = usbTxQueue[rdRPos];
 		if(usbDP.freqIndex < 0 || usbDP.freqIndex > USB_POINTS_MAX)
 			continue;
-
-		/*VNAObservation& value = usbDP.value;
-		value[0] = ecalApplyReflection(value[0] / value[1], usbDP.freqIndex) * value[1];
-
-		int32_t fwdRe = value[1].real();
-		int32_t fwdIm = value[1].imag();
-		int32_t reflRe = value[0].real();
-		int32_t reflIm = value[0].imag();
-		int32_t thruRe = value[2].real();
-		int32_t thruIm = value[2].imag();*/
-		
 		
 		complexf refl = ecalApplyReflection(usbDP.S11, usbDP.freqIndex);
 		complexf thru = usbDP.S21;
@@ -627,7 +617,6 @@ static void cmdReadFIFO(int address, int nValues) {
 		int32_t reflIm = int32_t(refl.imag() * 1073741824.f);
 		int32_t thruRe = int32_t(thru.real() * 1073741824.f);
 		int32_t thruIm = int32_t(thru.imag() * 1073741824.f);
-
 
 		uint8_t txbuf[32];
 		txbuf[0] = uint8_t(fwdRe >> 0);
@@ -660,8 +649,6 @@ static void cmdReadFIFO(int address, int nValues) {
 		txbuf[22] = uint8_t(thruIm >> 16);
 		txbuf[23] = uint8_t(thruIm >> 24);
 		
-		
-
 		txbuf[24] = uint8_t(usbDP.freqIndex >> 0);
 		txbuf[25] = uint8_t(usbDP.freqIndex >> 8);
 
@@ -1804,8 +1791,6 @@ namespace UIActions {
 	}
 
 	void enterBootload() {
-		// finish screen updates
-		lcd_spi_waitDMA();
 		// write magic value into ram (note: corrupts top of the stack)
 		bootloaderBootloadIndicator = BOOTLOADER_BOOTLOAD_MAGIC;
 		// soft reset
