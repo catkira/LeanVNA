@@ -44,7 +44,6 @@ extern volatile EcalStates ecalState;
 #define electrical_delay current_props._electrical_delay
 
 #define trace current_props._trace
-#define domain_mode current_props._domain_mode
 #define marker_smith_format current_props._marker_smith_format
 
 extern volatile int MEASUREMENT_NPERIODS_NORMAL;
