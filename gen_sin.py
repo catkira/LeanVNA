@@ -3,7 +3,7 @@ from math import *
 from scipy import signal
 
 # sine period in samples
-N = 200
+N = 100
 
 # integration period
 accumPeriod = 200
@@ -14,7 +14,7 @@ windowN = 100
 scale = (2**15 - 1)
 
 if windowN > 0:
-	window = signal.gaussian(windowN, std=15)
+	window = signal.gaussian(windowN, std=7)
 	#window = signal.bartlett(N)
 
 	rectWindow = signal.boxcar(windowN)
